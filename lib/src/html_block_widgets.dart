@@ -275,31 +275,54 @@ class HtmlTableBlock extends StatelessWidget {
           row.length > previousValue ? row.length : previousValue,
     );
 
-    return Table(
-      border: TableBorder.all(color: borderColor),
-      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-      children: List<TableRow>.generate(rows.length, (rowIndex) {
-        final row = rows[rowIndex];
-        return TableRow(
-          decoration: node.hasHeader && rowIndex == 0
-              ? BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                )
-              : null,
-          children: List<Widget>.generate(maxColumns, (colIndex) {
-            final text = colIndex < row.length ? row[colIndex] : '';
-            return Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                text,
-                style: rowIndex == 0 && node.hasHeader
-                    ? blockContext.baseStyle.copyWith(fontWeight: FontWeight.w700)
-                    : blockContext.baseStyle,
-              ),
-            );
+    Widget buildTable(Map<int, TableColumnWidth> columnWidths) {
+      return Table(
+        border: TableBorder.all(color: borderColor),
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        columnWidths: columnWidths,
+        children: List<TableRow>.generate(rows.length, (rowIndex) {
+          final row = rows[rowIndex];
+          return TableRow(
+            decoration: node.hasHeader && rowIndex == 0
+                ? BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  )
+                : null,
+            children: List<Widget>.generate(maxColumns, (colIndex) {
+              final text = colIndex < row.length ? row[colIndex] : '';
+              return Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  text,
+                  softWrap: true,
+                  style: rowIndex == 0 && node.hasHeader
+                      ? blockContext.baseStyle.copyWith(fontWeight: FontWeight.w700)
+                      : blockContext.baseStyle,
+                ),
+              );
+            }),
+          );
+        }),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        if (maxWidth.isFinite && maxWidth > 0 && maxColumns > 0) {
+          final columnWidth =
+              (maxWidth / maxColumns).clamp(48.0, double.infinity);
+          return buildTable({
+            for (var i = 0; i < maxColumns; i++) i: FixedColumnWidth(columnWidth),
+          });
+        }
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: buildTable({
+            for (var i = 0; i < maxColumns; i++) i: const IntrinsicColumnWidth(),
           }),
         );
-      }),
+      },
     );
   }
 }

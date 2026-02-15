@@ -20,7 +20,10 @@ class HtmlColumnReader extends StatelessWidget {
     this.blockBuilder,
     this.controller,
     this.onPageCountChanged,
+    this.onColumnCountChanged,
     this.onBookmarkIndexChanged,
+    this.onBookmarkColumnIndexChanged,
+    this.onBookmarkPageCandidatesChanged,
   }) : assert(columnsPerPage > 0, 'columnsPerPage must be > 0');
 
   final String html;
@@ -43,8 +46,19 @@ class HtmlColumnReader extends StatelessWidget {
   /// Called with the total page count when the reader has laid out. Use to enable/disable next/previous buttons or show "Page X of Y".
   final void Function(int pageCount)? onPageCountChanged;
 
+  /// Called with the total column count when the reader has laid out.
+  final void Function(int columnCount)? onColumnCountChanged;
+
   /// Called with a map of HTML id -> page index after layout.
   final void Function(Map<String, int> bookmarkIndex)? onBookmarkIndexChanged;
+
+  /// Called with a map of HTML id -> absolute column index after layout.
+  final void Function(Map<String, int> bookmarkColumnIndex)?
+  onBookmarkColumnIndexChanged;
+
+  /// Called with a map of HTML id -> all matching page indexes after layout.
+  final void Function(Map<String, List<int>> bookmarkPageCandidates)?
+  onBookmarkPageCandidatesChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -78,10 +92,15 @@ class HtmlColumnReader extends StatelessWidget {
         );
         final pages = _groupColumnsIntoPages(columns, columnsPerPage);
         final bookmarkIndex = _buildBookmarkIndex(pages);
+        final bookmarkColumnIndex = _buildBookmarkColumnIndex(columns);
+        final bookmarkPageCandidates = _buildBookmarkPageCandidates(pages);
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           onPageCountChanged?.call(pages.length);
+          onColumnCountChanged?.call(columns.length);
           onBookmarkIndexChanged?.call(bookmarkIndex);
+          onBookmarkColumnIndexChanged?.call(bookmarkColumnIndex);
+          onBookmarkPageCandidatesChanged?.call(bookmarkPageCandidates);
           controller?.updateLayoutData(
             pageCount: pages.length,
             bookmarkIndex: bookmarkIndex,
@@ -156,6 +175,15 @@ class HtmlColumnReader extends StatelessWidget {
     final maxHeight = viewportHeight;
 
     for (final block in blocks) {
+      if (block is HtmlColumnBreakBlockNode) {
+        if (currentColumn.isNotEmpty) {
+          columns.add(currentColumn);
+          currentColumn = <HtmlBlockNode>[];
+          currentHeight = 0;
+        }
+        continue;
+      }
+
       final estimate = block.estimateHeight(
         columnWidth: columnWidth,
         baseTextStyle: baseStyle,
@@ -206,6 +234,45 @@ class HtmlColumnReader extends StatelessWidget {
       }
     }
     return Map<String, int>.unmodifiable(index);
+  }
+
+  Map<String, int> _buildBookmarkColumnIndex(
+    List<List<HtmlBlockNode>> columns,
+  ) {
+    final index = <String, int>{};
+    for (var columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+      for (final block in columns[columnIndex]) {
+        final id = block.id;
+        if (id == null || id.trim().isEmpty || index.containsKey(id)) {
+          continue;
+        }
+        index[id] = columnIndex;
+      }
+    }
+    return Map<String, int>.unmodifiable(index);
+  }
+
+  Map<String, List<int>> _buildBookmarkPageCandidates(
+    List<List<List<HtmlBlockNode>>> pages,
+  ) {
+    final candidates = <String, List<int>>{};
+    for (var pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+      for (final column in pages[pageIndex]) {
+        for (final block in column) {
+          final id = block.id;
+          if (id == null || id.trim().isEmpty) {
+            continue;
+          }
+          candidates.putIfAbsent(id, () => <int>[]).add(pageIndex);
+        }
+      }
+    }
+    return Map<String, List<int>>.unmodifiable(
+      candidates.map(
+        (key, value) =>
+            MapEntry<String, List<int>>(key, List<int>.unmodifiable(value)),
+      ),
+    );
   }
 }
 

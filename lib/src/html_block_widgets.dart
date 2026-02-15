@@ -85,6 +85,9 @@ class HtmlBlockView extends StatelessWidget {
     if (block is HtmlDividerBlockNode) {
       return const HtmlDividerBlock();
     }
+    if (block is HtmlColumnBreakBlockNode) {
+      return const SizedBox.shrink();
+    }
     return const SizedBox.shrink();
   }
 }

@@ -350,3 +350,16 @@ class HtmlDividerBlockNode extends HtmlBlockNode {
     return 28;
   }
 }
+
+@immutable
+class HtmlColumnBreakBlockNode extends HtmlBlockNode {
+  const HtmlColumnBreakBlockNode({super.id});
+
+  @override
+  double estimateHeight({
+    required double columnWidth,
+    required TextStyle baseTextStyle,
+  }) {
+    return 0;
+  }
+}

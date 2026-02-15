@@ -69,6 +69,11 @@ class HtmlContentParser {
       return;
     }
 
+    if (tag == 'column-break') {
+      out.add(HtmlColumnBreakBlockNode(id: _elementId(node)));
+      return;
+    }
+
     if (tag == 'img') {
       final src = node.attributes['src']?.trim();
       if (src != null && src.isNotEmpty) {

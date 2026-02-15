@@ -64,39 +64,41 @@ class HtmlColumnReader extends StatelessWidget {
           itemCount: pages.length,
           itemBuilder: (context, pageIndex) {
             final pageColumns = pages[pageIndex];
-            return SizedBox(
-              height: viewportHeight + resolvedPadding.vertical,
-              child: Padding(
-                padding: resolvedPadding,
-                child: Row(
-                  children: List<Widget>.generate(columnsPerPage, (columnIndex) {
-                    final blockNodes = columnIndex < pageColumns.length
-                        ? pageColumns[columnIndex]
-                        : const <HtmlBlockNode>[];
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: columnIndex == columnsPerPage - 1
-                              ? 0
-                              : columnGap,
-                        ),
-                        child: _ColumnWidget(
-                          key: ValueKey<String>(
-                            'html-column-page-$pageIndex-col-$columnIndex',
+            return RepaintBoundary(
+              child: SizedBox(
+                height: viewportHeight + resolvedPadding.vertical,
+                child: Padding(
+                  padding: resolvedPadding,
+                  child: Row(
+                    children: List<Widget>.generate(columnsPerPage, (columnIndex) {
+                      final blockNodes = columnIndex < pageColumns.length
+                          ? pageColumns[columnIndex]
+                          : const <HtmlBlockNode>[];
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: columnIndex == columnsPerPage - 1
+                                ? 0
+                                : columnGap,
                           ),
-                          blocks: blockNodes,
-                          viewportHeight: viewportHeight,
-                          blockContext: HtmlBlockContext(
-                            baseStyle: baseStyle,
-                            headingStyles: headingStyles,
-                            onLinkTap: onLinkTap,
-                            imageBuilder: imageBuilder,
+                          child: _ColumnWidget(
+                            key: ValueKey<String>(
+                              'html-column-page-$pageIndex-col-$columnIndex',
+                            ),
+                            blocks: blockNodes,
+                            viewportHeight: viewportHeight,
+                            blockContext: HtmlBlockContext(
+                              baseStyle: baseStyle,
+                              headingStyles: headingStyles,
+                              onLinkTap: onLinkTap,
+                              imageBuilder: imageBuilder,
+                            ),
+                            blockBuilder: blockBuilder,
                           ),
-                          blockBuilder: blockBuilder,
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                      }),
+                  ),
                 ),
               ),
             );

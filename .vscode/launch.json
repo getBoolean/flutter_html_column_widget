@@ -5,9 +5,9 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Example",
-            "request": "launch",
+            "name": "Dart",
             "type": "dart",
+            "request": "launch",
             "program": "example/lib/main.dart"
         }
     ]

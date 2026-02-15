@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+typedef HtmlImageBuilder =
+    Widget Function(BuildContext context, String src, String? alt);
+
+typedef HtmlLinkTapCallback = void Function(String href);
+
 double _measureTextHeight(
   String text, {
   required TextStyle style,

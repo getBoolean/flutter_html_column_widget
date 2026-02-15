@@ -1,13 +1,8 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'html_block_widgets.dart';
 import 'html_content_parser.dart';
 import 'html_nodes.dart';
-
-typedef HtmlImageBuilder =
-    Widget Function(BuildContext context, String src, String? alt);
-
-typedef HtmlLinkTapCallback = void Function(String href);
 
 class HtmlColumnReader extends StatelessWidget {
   const HtmlColumnReader({
@@ -21,6 +16,7 @@ class HtmlColumnReader extends StatelessWidget {
     this.onLinkTap,
     this.imageBuilder,
     this.parser,
+    this.blockBuilder,
   }) : assert(columnsPerPage > 0, 'columnsPerPage must be > 0');
 
   final String html;
@@ -32,6 +28,9 @@ class HtmlColumnReader extends StatelessWidget {
   final HtmlLinkTapCallback? onLinkTap;
   final HtmlImageBuilder? imageBuilder;
   final HtmlContentParser? parser;
+
+  /// Optional custom builder for blocks. Return null to use the default widget.
+  final Widget? Function(BuildContext context, HtmlBlockNode block)? blockBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -84,10 +83,13 @@ class HtmlColumnReader extends StatelessWidget {
                           'html-column-page-$pageIndex-col-$columnIndex',
                         ),
                         blocks: blockNodes,
-                        baseStyle: baseStyle,
-                        headingStyles: headingStyles,
-                        onLinkTap: onLinkTap,
-                        imageBuilder: imageBuilder,
+                        blockContext: HtmlBlockContext(
+                          baseStyle: baseStyle,
+                          headingStyles: headingStyles,
+                          onLinkTap: onLinkTap,
+                          imageBuilder: imageBuilder,
+                        ),
+                        blockBuilder: blockBuilder,
                       ),
                     ),
                   );
@@ -158,233 +160,26 @@ class _ColumnWidget extends StatelessWidget {
   const _ColumnWidget({
     super.key,
     required this.blocks,
-    required this.baseStyle,
-    required this.headingStyles,
-    required this.onLinkTap,
-    required this.imageBuilder,
+    required this.blockContext,
+    this.blockBuilder,
   });
 
   final List<HtmlBlockNode> blocks;
-  final TextStyle baseStyle;
-  final Map<int, TextStyle> headingStyles;
-  final HtmlLinkTapCallback? onLinkTap;
-  final HtmlImageBuilder? imageBuilder;
+  final HtmlBlockContext blockContext;
+  final Widget? Function(BuildContext context, HtmlBlockNode block)? blockBuilder;
 
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
       itemCount: blocks.length,
       itemBuilder: (context, index) {
-        return _buildBlock(context, blocks[index]);
+        return HtmlBlockView(
+          block: blocks[index],
+          blockContext: blockContext,
+          builder: blockBuilder,
+        );
       },
       separatorBuilder: (context, index) => const SizedBox(height: 12),
-    );
-  }
-
-  Widget _buildBlock(BuildContext context, HtmlBlockNode block) {
-    if (block is HtmlTextBlockNode) {
-      return _buildTextBlock(context, block);
-    }
-    if (block is HtmlListBlockNode) {
-      return _buildListBlock(context, block);
-    }
-    if (block is HtmlTableBlockNode) {
-      return _buildTableBlock(context, block);
-    }
-    if (block is HtmlImageBlockNode) {
-      return _buildImageBlock(context, block);
-    }
-    if (block is HtmlDividerBlockNode) {
-      return const Divider(height: 1);
-    }
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildTextBlock(BuildContext context, HtmlTextBlockNode block) {
-    var effectiveStyle = block.style.applyTo(baseStyle);
-    if (block.headingLevel != null) {
-      effectiveStyle =
-          headingStyles[block.headingLevel] ??
-          _defaultHeadingStyle(baseStyle, block.headingLevel!);
-    }
-
-    if (block.preformatted) {
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Text(
-            block.plainText,
-            style: effectiveStyle.copyWith(fontFamily: 'monospace'),
-          ),
-        ),
-      );
-    }
-
-    final spans = <InlineSpan>[];
-    for (final segment in block.segments) {
-      final segmentStyle = segment.style.applyTo(
-        segment.isCode
-            ? effectiveStyle.copyWith(fontFamily: 'monospace')
-            : effectiveStyle,
-      );
-
-      if (segment.href != null && onLinkTap != null) {
-        spans.add(
-          TextSpan(
-            text: segment.text,
-            style: segmentStyle,
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => onLinkTap!(segment.href!),
-          ),
-        );
-      } else {
-        spans.add(TextSpan(text: segment.text, style: segmentStyle));
-      }
-    }
-
-    Widget content = RichText(
-      textAlign: block.style.textAlign ?? TextAlign.start,
-      text: TextSpan(style: effectiveStyle, children: spans),
-    );
-
-    if (block.isBlockquote) {
-      content = Container(
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: Theme.of(context).dividerColor, width: 4),
-          ),
-        ),
-        padding: const EdgeInsets.only(left: 12),
-        child: content,
-      );
-    }
-    return content;
-  }
-
-  Widget _buildListBlock(BuildContext context, HtmlListBlockNode block) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: List<Widget>.generate(block.items.length, (index) {
-        final bullet = block.ordered ? '${index + 1}.' : '\u2022';
-        final segments = block.items[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              SizedBox(width: 20, child: Text(bullet, style: baseStyle)),
-              Expanded(
-                child: RichText(
-                  text: TextSpan(
-                    style: block.style.applyTo(baseStyle),
-                    children: segments
-                        .map(
-                          (segment) => TextSpan(
-                            text: segment.text,
-                            style: segment.style.applyTo(baseStyle),
-                          ),
-                        )
-                        .toList(growable: false),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildTableBlock(BuildContext context, HtmlTableBlockNode block) {
-    final borderColor = Theme.of(context).dividerColor;
-    final rows = block.rows;
-    if (rows.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final maxColumns = rows.fold<int>(
-      0,
-      (previousValue, row) =>
-          row.length > previousValue ? row.length : previousValue,
-    );
-
-    return Table(
-      border: TableBorder.all(color: borderColor),
-      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-      children: List<TableRow>.generate(rows.length, (rowIndex) {
-        final row = rows[rowIndex];
-        return TableRow(
-          decoration: block.hasHeader && rowIndex == 0
-              ? BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                )
-              : null,
-          children: List<Widget>.generate(maxColumns, (colIndex) {
-            final text = colIndex < row.length ? row[colIndex] : '';
-            return Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                text,
-                style: rowIndex == 0 && block.hasHeader
-                    ? baseStyle.copyWith(fontWeight: FontWeight.w700)
-                    : baseStyle,
-              ),
-            );
-          }),
-        );
-      }),
-    );
-  }
-
-  Widget _buildImageBlock(BuildContext context, HtmlImageBlockNode block) {
-    if (imageBuilder != null) {
-      return imageBuilder!(context, block.src, block.alt);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Image.network(
-            block.src,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                padding: const EdgeInsets.all(10),
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Text('Unable to load image: ${block.src}'),
-              );
-            },
-          ),
-        ),
-        if (block.alt != null && block.alt!.trim().isNotEmpty) ...<Widget>[
-          const SizedBox(height: 6),
-          Text(
-            block.alt!,
-            style: baseStyle.copyWith(fontStyle: FontStyle.italic),
-          ),
-        ],
-      ],
-    );
-  }
-
-  TextStyle _defaultHeadingStyle(TextStyle base, int level) {
-    final size = switch (level.clamp(1, 6)) {
-      1 => 32.0,
-      2 => 28.0,
-      3 => 24.0,
-      4 => 21.0,
-      5 => 18.0,
-      _ => 16.0,
-    };
-    return base.copyWith(
-      fontSize: size,
-      fontWeight: FontWeight.w700,
-      height: 1.25,
     );
   }
 }

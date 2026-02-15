@@ -226,9 +226,10 @@ class HtmlTableBlockNode extends HtmlBlockNode {
       0,
       (prev, row) => row.length > prev ? row.length : prev,
     );
+    final minColWidth = columnWidth < 40.0 ? 0.0 : 40.0;
     final colWidth = maxCols == 0
         ? columnWidth
-        : (columnWidth / maxCols).clamp(40.0, columnWidth);
+        : (columnWidth / maxCols).clamp(minColWidth, columnWidth);
     var total = 0.0;
     for (final row in rows) {
       var rowHeight = 0.0;
@@ -236,7 +237,7 @@ class HtmlTableBlockNode extends HtmlBlockNode {
         final h = _measureTextHeight(
           cell,
           style: baseTextStyle.copyWith(height: 1.3),
-          maxWidth: colWidth - 16,
+          maxWidth: (colWidth - 16).clamp(1.0, double.infinity),
         );
         if (h > rowHeight) {
           rowHeight = h;

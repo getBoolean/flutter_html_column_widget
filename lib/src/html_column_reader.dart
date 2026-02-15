@@ -46,9 +46,11 @@ class HtmlColumnReader extends StatelessWidget {
         final availableHeight = constraints.maxHeight.isFinite
             ? constraints.maxHeight
             : MediaQuery.sizeOf(context).height;
-        final innerWidth = availableWidth - resolvedPadding.horizontal;
-        final columnWidth =
-            (innerWidth - (columnGap * (columnsPerPage - 1))) / columnsPerPage;
+        final innerWidth = (availableWidth - resolvedPadding.horizontal)
+            .clamp(0.0, double.infinity);
+        final columnWidth = ((innerWidth - (columnGap * (columnsPerPage - 1))) /
+                columnsPerPage)
+            .clamp(1.0, double.infinity);
         final viewportHeight = (availableHeight - resolvedPadding.vertical)
             .clamp(140.0, double.infinity);
 

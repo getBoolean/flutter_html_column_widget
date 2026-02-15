@@ -82,6 +82,7 @@ class _ExamplePageState extends State<ExamplePage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
+
 /*
 import 'package:flutter/material.dart';
 
@@ -168,7 +169,7 @@ class _ExamplePageState extends State<ExamplePage> {
   }
 }
 
-/*
+// legacy copy starts
 import 'dart:async';
 
 import 'package:flutter/material.dart';

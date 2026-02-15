@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_html_viewer:
+  flutter_html_column_viewer:
     path: ../
 
 dev_dependencies:

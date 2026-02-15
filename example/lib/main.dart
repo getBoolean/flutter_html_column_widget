@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_html_viewer/flutter_html_viewer.dart';
+import 'package:flutter_html_column_viewer/flutter_html_column_viewer.dart';
 
 void main() {
   runApp(const MainApp());

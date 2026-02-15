@@ -12,18 +12,133 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Flutter HTML Viewer Example')),
-        body: HtmlColumnReader(
-          columnsPerPage: 2,
-          html: _sampleHtml,
-          onLinkTap: (href) {
-            final uri = Uri.tryParse(href);
-            if (uri != null) {
-              launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-          },
-        ),
+      home: const _ExamplePage(),
+    );
+  }
+}
+
+class _ExamplePage extends StatefulWidget {
+  const _ExamplePage();
+
+  @override
+  State<_ExamplePage> createState() => _ExamplePageState();
+}
+
+class _ExamplePageState extends State<_ExamplePage> {
+  final PageController _pageController = PageController();
+  int _pageCount = 0;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController.addListener(_onPageChanged);
+  }
+
+  @override
+  void dispose() {
+    _pageController.removeListener(_onPageChanged);
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged() {
+    final page = _pageController.page?.round() ?? 0;
+    final maxPage = _pageCount > 0 ? _pageCount - 1 : 0;
+    final newPage = page.clamp(0, maxPage);
+    if (newPage != _currentPage && mounted) {
+      setState(() => _currentPage = newPage);
+    }
+  }
+
+  void _nextPage() {
+    if (_currentPage < _pageCount - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _previousPage() {
+    if (_currentPage > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Flutter HTML Viewer Example'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _currentPage > 0 ? _previousPage : null,
+            tooltip: 'Previous page',
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+            child: Center(
+              child: Text(
+                _pageCount > 0
+                    ? '${_currentPage + 1} / $_pageCount'
+                    : '—',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _pageCount > 0 && _currentPage < _pageCount - 1
+                ? _nextPage
+                : null,
+            tooltip: 'Next page',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: HtmlColumnReader(
+              controller: _pageController,
+              columnsPerPage: 2,
+              html: _sampleHtml,
+              onLinkTap: (href) {
+                final uri = Uri.tryParse(href);
+                if (uri != null) {
+                  launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              onPageCountChanged: (count) {
+                setState(() => _pageCount = count);
+              },
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: ButtonBar(
+              alignment: MainAxisAlignment.center,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: _currentPage > 0 ? _previousPage : null,
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Previous'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _pageCount > 0 && _currentPage < _pageCount - 1
+                      ? _nextPage
+                      : null,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('Next'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

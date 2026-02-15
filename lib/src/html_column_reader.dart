@@ -17,6 +17,8 @@ class HtmlColumnReader extends StatelessWidget {
     this.imageBuilder,
     this.parser,
     this.blockBuilder,
+    this.controller,
+    this.onPageCountChanged,
   }) : assert(columnsPerPage > 0, 'columnsPerPage must be > 0');
 
   final String html;
@@ -31,6 +33,12 @@ class HtmlColumnReader extends StatelessWidget {
 
   /// Optional custom builder for blocks. Return null to use the default widget.
   final Widget? Function(BuildContext context, HtmlBlockNode block)? blockBuilder;
+
+  /// Optional [PageController] for programmatic page control (e.g. [PageController.nextPage], [PageController.previousPage], [PageController.jumpToPage]).
+  final PageController? controller;
+
+  /// Called with the total page count when the reader has laid out. Use to enable/disable next/previous buttons or show "Page X of Y".
+  final void Function(int pageCount)? onPageCountChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +70,12 @@ class HtmlColumnReader extends StatelessWidget {
         );
         final pages = _groupColumnsIntoPages(columns, columnsPerPage);
 
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          onPageCountChanged?.call(pages.length);
+        });
+
         return PageView.builder(
+          controller: controller,
           itemCount: pages.length,
           itemBuilder: (context, pageIndex) {
             final pageColumns = pages[pageIndex];

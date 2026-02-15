@@ -1,4 +1,4 @@
-library flutter_html_column_viewer;
+library;
 
 export 'src/html_block_widgets.dart';
 export 'src/html_column_reader.dart';

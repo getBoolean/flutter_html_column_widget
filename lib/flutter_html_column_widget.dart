@@ -3,6 +3,7 @@ library;
 // Reader layer
 export 'src/reader/html_column_reader.dart';
 export 'src/reader/html_reader_controller.dart';
+export 'src/reader/html_scrollable_reader.dart';
 
 // HTML spec-aligned hierarchy
 export 'src/spec/html/model/html_nodes.dart';

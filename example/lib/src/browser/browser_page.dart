@@ -130,31 +130,15 @@ class BrowserToolbar extends StatelessWidget {
   }
 }
 
-class _BrowserBody extends StatefulWidget {
+class _BrowserBody extends StatelessWidget {
   const _BrowserBody({required this.controller, required this.onMessage});
 
   final BrowserController controller;
   final ValueChanged<String> onMessage;
 
   @override
-  State<_BrowserBody> createState() => _BrowserBodyState();
-}
-
-class _BrowserBodyState extends State<_BrowserBody> {
-  final ScrollController _scrollController = ScrollController();
-  final HtmlContentParser _parser = HtmlContentParser();
-  final Map<String, GlobalKey> _anchorKeys = <String, GlobalKey>{};
-  String? _lastDocumentToken;
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
+    final controller = this.controller;
     if (controller.loading && controller.html.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -162,70 +146,31 @@ class _BrowserBodyState extends State<_BrowserBody> {
       return const Center(child: Text('Enter a URL to load HTML.'));
     }
 
-    final documentToken =
-        '${controller.currentUri?.toString() ?? ''}::${controller.html.hashCode}';
-    if (documentToken != _lastDocumentToken) {
-      _lastDocumentToken = documentToken;
-      _anchorKeys.clear();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(0);
-        }
-      });
-    }
-    final blocks = _parser.parse(
-      controller.html,
-      externalCssResolver: controller.resolveExternalCss,
-    );
-
     return Stack(
       children: <Widget>[
-        ListView.separated(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(16),
-          itemCount: blocks.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final block = blocks[index];
-            final blockKey = _keyForAnchor(block.id);
-            final view = HtmlBlockView(
-              block: block,
-              blockContext: HtmlBlockContext(
-                baseStyle: Theme.of(context).textTheme.bodyMedium!,
-                onRefTap: (reference) {
-                  unawaited(
-                    controller
-                        .openReference(
-                          reference,
-                          scrollToFragment: _scrollToFragment,
-                        )
-                        .then((message) {
-                          if (message != null && message.isNotEmpty) {
-                            widget.onMessage(message);
-                          }
-                        }),
-                  );
-                },
-                imageBuilder: (context, src, alt) {
-                  final imageUri = controller.resolveImageUri(src);
-                  if (imageUri == null ||
-                      !(imageUri.scheme == 'http' ||
-                          imageUri.scheme == 'https')) {
-                    return _MissingImagePlaceholder(src: src, alt: alt);
-                  }
-                  return Image.network(
-                    imageUri.toString(),
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) =>
-                        _MissingImagePlaceholder(src: src, alt: alt),
-                  );
-                },
-              ),
+        HtmlScrollableReader(
+          html: controller.html,
+          textStyle: Theme.of(context).textTheme.bodyMedium,
+          externalCssResolver: controller.resolveExternalCss,
+          onMessage: onMessage,
+          onRefTap: (reference, {required scrollToFragment}) {
+            return controller.openReference(
+              reference,
+              scrollToFragment: scrollToFragment,
             );
-            if (blockKey == null) {
-              return view;
+          },
+          imageBuilder: (context, src, alt) {
+            final imageUri = controller.resolveImageUri(src);
+            if (imageUri == null ||
+                !(imageUri.scheme == 'http' || imageUri.scheme == 'https')) {
+              return _MissingImagePlaceholder(src: src, alt: alt);
             }
-            return KeyedSubtree(key: blockKey, child: view);
+            return Image.network(
+              imageUri.toString(),
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+                  _MissingImagePlaceholder(src: src, alt: alt),
+            );
           },
         ),
         if (controller.loading)
@@ -236,32 +181,6 @@ class _BrowserBodyState extends State<_BrowserBody> {
             child: LinearProgressIndicator(minHeight: 2),
           ),
       ],
-    );
-  }
-
-  GlobalKey? _keyForAnchor(String? id) {
-    if (id == null || id.trim().isEmpty) {
-      return null;
-    }
-    return _anchorKeys.putIfAbsent(id, GlobalKey.new);
-  }
-
-  Future<void> _scrollToFragment(String fragmentId) async {
-    final key = _anchorKeys[fragmentId];
-    if (key == null) {
-      widget.onMessage('Anchor not found: #$fragmentId');
-      return;
-    }
-    final anchorContext = key.currentContext;
-    if (anchorContext == null) {
-      widget.onMessage('Anchor not visible yet: #$fragmentId');
-      return;
-    }
-    await Scrollable.ensureVisible(
-      anchorContext,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-      alignment: 0.08,
     );
   }
 }

@@ -58,12 +58,16 @@ class HtmlBoxStyle {
     this.margin,
     this.padding,
     this.backgroundColor,
+    this.widthPx,
+    this.widthFactor,
     this.border = const HtmlBorderStyle(),
   });
 
   final EdgeInsets? margin;
   final EdgeInsets? padding;
   final Color? backgroundColor;
+  final double? widthPx;
+  final double? widthFactor;
   final HtmlBorderStyle border;
 
   HtmlBoxStyle merge(HtmlBoxStyle? other) {
@@ -74,6 +78,8 @@ class HtmlBoxStyle {
       margin: other.margin ?? margin,
       padding: other.padding ?? padding,
       backgroundColor: other.backgroundColor ?? backgroundColor,
+      widthPx: other.widthPx ?? widthPx,
+      widthFactor: other.widthFactor ?? widthFactor,
       border: border.merge(other.border),
     );
   }

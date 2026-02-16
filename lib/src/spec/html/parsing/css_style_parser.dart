@@ -179,11 +179,15 @@ class CssStyleParser {
       sharedWidth: sharedBorderWidth,
       sharedStyle: sharedBorderStyle,
     );
+    final backgroundColor =
+        _parseColor(map['background-color']) ??
+        _parseBackgroundColor(map['background']);
+    final parsedWidth = _parseWidth(map['width']);
 
     return HtmlStyleData(
       color: _parseColor(map['color']),
-      backgroundColor: _parseColor(map['background-color']),
-      blockBackgroundColor: _parseColor(map['background-color']),
+      backgroundColor: backgroundColor,
+      blockBackgroundColor: backgroundColor,
       fontSize: _parseFontSize(map['font-size']),
       fontWeight: _parseFontWeight(map['font-weight']),
       fontStyle: _parseFontStyle(map['font-style']),
@@ -250,7 +254,9 @@ class CssStyleParser {
           bottom: map['padding-bottom'],
           left: map['padding-left'],
         ),
-        backgroundColor: _parseColor(map['background-color']),
+        backgroundColor: backgroundColor,
+        widthPx: parsedWidth.widthPx,
+        widthFactor: parsedWidth.widthFactor,
         border: HtmlBorderStyle(
           top: HtmlStyleSide(
             color: resolvedTop.color,
@@ -276,7 +282,7 @@ class CssStyleParser {
       ),
       textStyle: HtmlTextStyleSpec(
         color: _parseColor(map['color']),
-        backgroundColor: _parseColor(map['background-color']),
+        backgroundColor: backgroundColor,
         fontSize: _parseFontSize(map['font-size']),
         fontWeight: _parseFontWeight(map['font-weight']),
         fontStyle: _parseFontStyle(map['font-style']),
@@ -767,6 +773,43 @@ class CssStyleParser {
     return _namedColors[v];
   }
 
+  Color? _parseBackgroundColor(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null;
+    }
+    for (final token in value.split(RegExp(r'\s+'))) {
+      final parsed = _parseColor(token);
+      if (parsed != null) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  _ParsedWidth _parseWidth(String? value) {
+    if (value == null) {
+      return const _ParsedWidth();
+    }
+    final normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty ||
+        normalized == 'auto' ||
+        normalized == 'initial' ||
+        normalized == 'unset' ||
+        normalized == 'inherit') {
+      return const _ParsedWidth();
+    }
+    if (normalized.endsWith('%')) {
+      final pct = double.tryParse(
+        normalized.substring(0, normalized.length - 1),
+      );
+      if (pct == null) {
+        return const _ParsedWidth();
+      }
+      return _ParsedWidth(widthFactor: pct / 100);
+    }
+    return _ParsedWidth(widthPx: _parseLength(normalized));
+  }
+
   static const Map<String, Color> _namedColors = <String, Color>{
     'black': Colors.black,
     'white': Colors.white,
@@ -841,6 +884,7 @@ class CssStyleParser {
 
   static const Set<String> _supportedProperties = <String>{
     'color',
+    'background',
     'background-color',
     'font-size',
     'font-weight',
@@ -889,6 +933,7 @@ class CssStyleParser {
     'border-right-style',
     'border-bottom-style',
     'border-left-style',
+    'width',
   };
 }
 
@@ -898,4 +943,11 @@ class _BorderParts {
   final Color? color;
   final double? width;
   final BorderStyle? style;
+}
+
+class _ParsedWidth {
+  const _ParsedWidth({this.widthPx, this.widthFactor});
+
+  final double? widthPx;
+  final double? widthFactor;
 }

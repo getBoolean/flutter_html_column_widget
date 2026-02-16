@@ -71,13 +71,21 @@ class HtmlColumnReader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final baseStyle = textStyle ?? Theme.of(context).textTheme.bodyMedium!;
-    final blocks = (parser ?? HtmlContentParser()).parse(
+    final effectiveParser = parser ?? HtmlContentParser();
+    final blocks = effectiveParser.parse(
       html,
       externalCss: externalCss,
       externalCssResolver: externalCssResolver,
     );
+    final documentStyle = effectiveParser.parseDocumentStyle(
+      html,
+      externalCss: externalCss,
+      externalCssResolver: externalCssResolver,
+    );
+    final documentBackgroundColor =
+        documentStyle.blockBackgroundColor ?? documentStyle.backgroundColor;
 
-    return LayoutBuilder(
+    final content = LayoutBuilder(
       builder: (context, constraints) {
         final resolvedPadding = pagePadding.resolve(Directionality.of(context));
         final availableWidth = constraints.maxWidth.isFinite
@@ -171,6 +179,10 @@ class HtmlColumnReader extends StatelessWidget {
         );
       },
     );
+    if (documentBackgroundColor == null) {
+      return content;
+    }
+    return ColoredBox(color: documentBackgroundColor, child: content);
   }
 
   List<List<HtmlBlockNode>> _partitionIntoColumns(

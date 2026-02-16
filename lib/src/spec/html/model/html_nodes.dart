@@ -298,10 +298,7 @@ class HtmlStyleData {
       fontSize: fontSize ?? base.fontSize,
       fontWeight: fontWeight ?? base.fontWeight,
       fontStyle: fontStyle ?? base.fontStyle,
-      fontFeatures: _resolveFontFeatures(
-        base.fontFeatures,
-        fontVariant,
-      ),
+      fontFeatures: _resolveFontFeatures(base.fontFeatures, fontVariant),
       fontFamily: fontFamily ?? base.fontFamily,
       decoration: decoration ?? base.decoration,
       height: lineHeight ?? base.height,
@@ -507,8 +504,9 @@ class HtmlTextBlockNode extends HtmlBlockNode {
     );
     final preformattedHorizontalInset = preformatted ? 20.0 : 0.0;
     final preformattedVerticalInset = preformatted ? 20.0 : 0.0;
-    final blockquoteHorizontalInset =
-        isBlockquote ? 12.0 + (style.borderLeftWidth ?? 3.0) : 0.0;
+    final blockquoteHorizontalInset = isBlockquote
+        ? 12.0 + (style.borderLeftWidth ?? 3.0)
+        : 0.0;
     final textMaxWidth =
         (columnWidth -
                 _styleHorizontalInsets(style) -

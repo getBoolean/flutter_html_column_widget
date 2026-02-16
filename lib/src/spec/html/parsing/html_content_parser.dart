@@ -28,7 +28,8 @@ class HtmlContentParser {
     final fragment = html_parser.parseFragment(html);
     final blocks = <HtmlBlockNode>[];
     final rules = _buildCssRules(
-      fragment,
+      links: fragment.querySelectorAll('link'),
+      styleElements: fragment.querySelectorAll('style'),
       externalCss: externalCss,
       externalCssResolver: externalCssResolver,
     );
@@ -38,6 +39,40 @@ class HtmlContentParser {
     }
 
     return blocks.where(_hasMeaningfulContent).toList(growable: false);
+  }
+
+  HtmlStyleData parseDocumentStyle(
+    String html, {
+    String? externalCss,
+    String? Function(String href)? externalCssResolver,
+  }) {
+    final document = html_parser.parse(html);
+    final rules = _buildCssRules(
+      links: document.querySelectorAll('link'),
+      styleElements: document.querySelectorAll('style'),
+      externalCss: externalCss,
+      externalCssResolver: externalCssResolver,
+    );
+    final htmlElement = document.documentElement;
+    if (htmlElement == null) {
+      return HtmlStyleData.empty;
+    }
+    var resolved = _resolveElementStyle(
+      node: htmlElement,
+      inheritedStyle: HtmlStyleData.empty,
+      rules: rules,
+    );
+    final body = document.body;
+    if (body != null) {
+      resolved = resolved.merge(
+        _resolveElementStyle(
+          node: body,
+          inheritedStyle: resolved,
+          rules: rules,
+        ),
+      );
+    }
+    return resolved;
   }
 
   bool _hasMeaningfulContent(HtmlBlockNode node) {
@@ -586,8 +621,9 @@ class HtmlContentParser {
     return merged;
   }
 
-  List<CssStyleRule> _buildCssRules(
-    dom.DocumentFragment fragment, {
+  List<CssStyleRule> _buildCssRules({
+    required Iterable<dom.Element> links,
+    required Iterable<dom.Element> styleElements,
     String? externalCss,
     String? Function(String href)? externalCssResolver,
   }) {
@@ -597,7 +633,7 @@ class HtmlContentParser {
     }
 
     if (externalCssResolver != null) {
-      for (final link in fragment.querySelectorAll('link')) {
+      for (final link in links) {
         final rel = _attribute(link, const <String>['rel']);
         if (!_isPreferredStylesheetRel(rel)) {
           continue;
@@ -619,7 +655,7 @@ class HtmlContentParser {
       }
     }
 
-    for (final styleElement in fragment.querySelectorAll('style')) {
+    for (final styleElement in styleElements) {
       final css = styleElement.text;
       if (css.trim().isNotEmpty) {
         styleSheets.add(
@@ -651,8 +687,7 @@ class HtmlContentParser {
       return false;
     }
     final relTokens = rel.split(RegExp(r'\s+'));
-    return relTokens.contains('stylesheet') &&
-        !relTokens.contains('alternate');
+    return relTokens.contains('stylesheet') && !relTokens.contains('alternate');
   }
 
   String _expandLeadingCssImports(
@@ -732,11 +767,13 @@ class HtmlContentParser {
   int _skipCssWhitespaceAndComments(String css, int start) {
     var offset = start;
     while (offset < css.length) {
-      if (offset + 4 <= css.length && css.substring(offset, offset + 4) == '<!--') {
+      if (offset + 4 <= css.length &&
+          css.substring(offset, offset + 4) == '<!--') {
         offset += 4;
         continue;
       }
-      if (offset + 3 <= css.length && css.substring(offset, offset + 3) == '-->') {
+      if (offset + 3 <= css.length &&
+          css.substring(offset, offset + 3) == '-->') {
         offset += 3;
         continue;
       }
@@ -790,7 +827,10 @@ class HtmlContentParser {
 }
 
 class _ImportParseResult {
-  const _ImportParseResult({required this.directives, required this.consumedOffset});
+  const _ImportParseResult({
+    required this.directives,
+    required this.consumedOffset,
+  });
 
   final List<_CssImportDirective> directives;
   final int consumedOffset;

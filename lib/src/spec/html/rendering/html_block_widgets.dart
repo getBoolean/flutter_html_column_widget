@@ -658,6 +658,8 @@ Widget _applyBlockDecorations({
   final resolvedMargin = style.boxStyle?.margin ?? style.margin;
   final resolvedBackground =
       style.boxStyle?.backgroundColor ?? style.blockBackgroundColor;
+  final resolvedWidthPx = style.boxStyle?.widthPx;
+  final resolvedWidthFactor = style.boxStyle?.widthFactor;
   final border = _resolveBoxBorder(context, style);
   final hasContainerStyle =
       resolvedPadding != null || resolvedBackground != null || border != null;
@@ -665,6 +667,15 @@ Widget _applyBlockDecorations({
     current = Container(
       padding: resolvedPadding,
       decoration: BoxDecoration(color: resolvedBackground, border: border),
+      child: current,
+    );
+  }
+  if (resolvedWidthPx != null && resolvedWidthPx > 0) {
+    current = SizedBox(width: resolvedWidthPx, child: current);
+  } else if (resolvedWidthFactor != null && resolvedWidthFactor > 0) {
+    current = FractionallySizedBox(
+      alignment: Alignment.centerLeft,
+      widthFactor: resolvedWidthFactor,
       child: current,
     );
   }

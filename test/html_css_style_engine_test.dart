@@ -150,8 +150,7 @@ void main() {
 
     test('applies li selector styles over inherited ul color', () {
       final parser = HtmlContentParser();
-      final blocks = parser.parse(
-        '''
+      final blocks = parser.parse('''
         <style>
           ul { color: red; }
           li.three { color: green; }
@@ -161,8 +160,7 @@ void main() {
           <li class="threea">purple item</li>
           <li class="three">green item</li>
         </ul>
-        ''',
-      );
+        ''');
 
       final list = blocks.whereType<HtmlListBlockNode>().first;
       final firstItemColor = list.items[0].first.style.color;
@@ -173,16 +171,14 @@ void main() {
 
     test('applies selectors wrapped in legacy HTML comment tokens', () {
       final parser = HtmlContentParser();
-      final blocks = parser.parse(
-        '''
+      final blocks = parser.parse('''
         <style>
           <!--
           p.six { color: green; }
           -->
         </style>
         <p class="six">green paragraph</p>
-        ''',
-      );
+        ''');
 
       final paragraph = blocks.whereType<HtmlTextBlockNode>().first;
       expect(paragraph.style.color, Colors.green);
@@ -190,16 +186,14 @@ void main() {
 
     test('keeps parsing selectors after ignored non-leading @import', () {
       final parser = HtmlContentParser();
-      final blocks = parser.parse(
-        '''
+      final blocks = parser.parse('''
         <style>
           p.before { color: black; }
           @import url("late.css");
           p.six { color: green; }
         </style>
         <p class="six">green paragraph</p>
-        ''',
-      );
+        ''');
 
       final paragraph = blocks.whereType<HtmlTextBlockNode>().first;
       expect(paragraph.style.color, Colors.green);
@@ -278,6 +272,31 @@ void main() {
       expect(paragraph.style.borderRightColor, const Color(0xFF00FF00));
       expect(paragraph.style.borderBottomStyle, BorderStyle.solid);
       expect(paragraph.style.borderLeftWidth, closeTo(1, 0.0001));
+    });
+
+    test('parses background shorthand color and percentage width', () {
+      final parser = HtmlContentParser();
+      final blocks = parser.parse(
+        '<p style="background: #cccccc; width: 100%;">hello</p>',
+      );
+      final paragraph = blocks.whereType<HtmlTextBlockNode>().first;
+      expect(paragraph.style.blockBackgroundColor, const Color(0xFFCCCCCC));
+      expect(
+        paragraph.style.boxStyle?.backgroundColor,
+        const Color(0xFFCCCCCC),
+      );
+      expect(paragraph.style.boxStyle?.widthFactor, closeTo(1.0, 0.0001));
+    });
+
+    test('resolves document background from body selector', () {
+      final parser = HtmlContentParser();
+      final style = parser.parseDocumentStyle('''
+        <style>
+          body { background: #cccccc; }
+        </style>
+        <p>hello</p>
+      ''');
+      expect(style.blockBackgroundColor, const Color(0xFFCCCCCC));
     });
   });
 }

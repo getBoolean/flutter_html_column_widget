@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:html/dom.dart' as dom;
+import 'package:html/parser.dart' as html_parser;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class BrowserPageLoadResult {
@@ -19,7 +21,8 @@ class BrowserPageLoadResult {
 class BrowserPageService {
   BrowserPageService();
 
-  static const int _cacheSchemaVersion = 3;
+  static const int _cacheSchemaVersion = 4;
+  static const int _maxEmbeddedDocumentDepth = 2;
   static const int _maxFetchAttempts = 4;
   static const Duration _minRequestInterval = Duration(milliseconds: 350);
   static const Duration _loadTimeout = Duration(seconds: 25);
@@ -55,6 +58,25 @@ class BrowserPageService {
     final cacheKey = uri.toString();
     final cached = _cache[cacheKey];
     if (cached != null) {
+      final expandedCachedHtml = await _inlineEmbeddedHtmlDocuments(
+        cached.html,
+        pageUri: uri,
+        depth: 0,
+        activeChain: <Uri>{uri},
+      );
+      if (expandedCachedHtml != cached.html) {
+        final linkedCss = await _loadLinkedCss(uri, expandedCachedHtml);
+        _cache[cacheKey] = _CachedPageData(
+          html: expandedCachedHtml,
+          linkedCss: linkedCss,
+        );
+        await _persistCache();
+        return BrowserPageLoadResult(
+          uri: uri,
+          html: expandedCachedHtml,
+          linkedCss: linkedCss,
+        );
+      }
       return BrowserPageLoadResult(
         uri: uri,
         html: cached.html,
@@ -62,11 +84,103 @@ class BrowserPageService {
       );
     }
 
-    final html = await _fetchText(uri);
-    final linkedCss = await _loadLinkedCss(uri, html);
-    _cache[cacheKey] = _CachedPageData(html: html, linkedCss: linkedCss);
+    final rawHtml = await _fetchText(uri);
+    final expandedHtml = await _inlineEmbeddedHtmlDocuments(
+      rawHtml,
+      pageUri: uri,
+      depth: 0,
+      activeChain: <Uri>{uri},
+    );
+    final linkedCss = await _loadLinkedCss(uri, expandedHtml);
+    _cache[cacheKey] = _CachedPageData(
+      html: expandedHtml,
+      linkedCss: linkedCss,
+    );
     await _persistCache();
-    return BrowserPageLoadResult(uri: uri, html: html, linkedCss: linkedCss);
+    return BrowserPageLoadResult(
+      uri: uri,
+      html: expandedHtml,
+      linkedCss: linkedCss,
+    );
+  }
+
+  Future<String> _inlineEmbeddedHtmlDocuments(
+    String html, {
+    required Uri pageUri,
+    required int depth,
+    required Set<Uri> activeChain,
+  }) async {
+    if (depth >= _maxEmbeddedDocumentDepth || html.trim().isEmpty) {
+      return html;
+    }
+    final document = html_parser.parse(html);
+    final objects = document.querySelectorAll('object');
+    if (objects.isEmpty) {
+      return html;
+    }
+
+    for (final object in objects) {
+      final data = object.attributes['data']?.trim();
+      if (data == null || data.isEmpty) {
+        continue;
+      }
+      Uri nestedUri;
+      try {
+        nestedUri = normalizeAddress(data, base: pageUri);
+      } on FormatException {
+        continue;
+      }
+      if (!_isLikelyHtmlObject(object, nestedUri) ||
+          activeChain.contains(nestedUri)) {
+        continue;
+      }
+      try {
+        final nestedHtml = await _fetchText(nestedUri, referer: pageUri);
+        final expandedNestedHtml = await _inlineEmbeddedHtmlDocuments(
+          nestedHtml,
+          pageUri: nestedUri,
+          depth: depth + 1,
+          activeChain: <Uri>{...activeChain, nestedUri},
+        );
+        final nestedDocument = html_parser.parse(expandedNestedHtml);
+        final bodyHtml = nestedDocument.body?.innerHtml;
+        final replacementHtml = bodyHtml != null && bodyHtml.trim().isNotEmpty
+            ? bodyHtml
+            : expandedNestedHtml;
+        final replacementNodes = html_parser
+            .parseFragment(replacementHtml)
+            .nodes
+            .toList(growable: false);
+        if (replacementNodes.isEmpty) {
+          continue;
+        }
+        final parent = object.parentNode;
+        if (parent == null) {
+          continue;
+        }
+        for (final node in replacementNodes) {
+          parent.insertBefore(node, object);
+        }
+        object.remove();
+      } catch (_) {
+        // Keep object fallback content when nested document cannot be loaded.
+      }
+    }
+    return document.outerHtml;
+  }
+
+  bool _isLikelyHtmlObject(dom.Element object, Uri nestedUri) {
+    final type = object.attributes['type']?.trim().toLowerCase();
+    if (type != null &&
+        (type.startsWith('text/html') ||
+            type.startsWith('application/xhtml+xml'))) {
+      return true;
+    }
+    final path = nestedUri.path.toLowerCase();
+    return path.endsWith('.html') ||
+        path.endsWith('.htm') ||
+        path.endsWith('.xhtml') ||
+        path.endsWith('.xht');
   }
 
   Future<void> clearCache(Uri uri) async {
@@ -193,8 +307,7 @@ class BrowserPageService {
       return false;
     }
     final relTokens = rel.split(RegExp(r'\s+'));
-    return relTokens.contains('stylesheet') &&
-        !relTokens.contains('alternate');
+    return relTokens.contains('stylesheet') && !relTokens.contains('alternate');
   }
 
   Set<String> _extractInlineStyleImportHrefs(String html) {
@@ -250,11 +363,13 @@ class BrowserPageService {
   int _skipCssWhitespaceAndComments(String css, int start) {
     var offset = start;
     while (offset < css.length) {
-      if (offset + 4 <= css.length && css.substring(offset, offset + 4) == '<!--') {
+      if (offset + 4 <= css.length &&
+          css.substring(offset, offset + 4) == '<!--') {
         offset += 4;
         continue;
       }
-      if (offset + 3 <= css.length && css.substring(offset, offset + 3) == '-->') {
+      if (offset + 3 <= css.length &&
+          css.substring(offset, offset + 3) == '-->') {
         offset += 3;
         continue;
       }
@@ -501,8 +616,8 @@ class BrowserPageService {
             'html': entry.value.html,
             'linkedCss': entry.value.linkedCss,
           },
-        },
-      };
+      },
+    };
     await file.parent.create(recursive: true);
     await file.writeAsString(jsonEncode(encoded), flush: true);
   }

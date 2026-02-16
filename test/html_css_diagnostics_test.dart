@@ -34,8 +34,28 @@ void main() {
       <p>Hello</p>
     ''');
 
+    expect(warnings.where((w) => w.property == 'font-variant'), isEmpty);
+  });
+
+  test('does not log unsupported warning for background and width', () {
+    final warnings = <HtmlCssWarning>[];
+    final diagnostics = HtmlCssDiagnostics(onWarning: warnings.add);
+    final parser = HtmlContentParser(
+      styleParser: CssStyleParser(diagnostics: diagnostics),
+    );
+
+    parser.parse('''
+      <style>
+        body { background: #CCCCCC; }
+        object { width: 100%; }
+      </style>
+      <object data="sample.svg"></object>
+    ''');
+
     expect(
-      warnings.where((w) => w.property == 'font-variant'),
+      warnings.where(
+        (w) => w.property == 'background' || w.property == 'width',
+      ),
       isEmpty,
     );
   });

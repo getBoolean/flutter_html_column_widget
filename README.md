@@ -143,6 +143,9 @@ The `example/lib/browser_main.dart` app shows a usage of the HTML renderer as a 
 
 ![Browser output](docs/browser.png)
 
+**Live demos (GitHub Pages):**
+[Reader demo](https://getboolean.github.io/flutter_html_column_widget/reader/) | [Browser demo](https://getboolean.github.io/flutter_html_column_widget/browser/)
+
 ---
 
 ## License

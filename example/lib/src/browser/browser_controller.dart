@@ -6,10 +6,10 @@ import 'package:flutter_html_column_widget/flutter_html_column_widget.dart';
 import 'browser_page_service.dart';
 
 class BrowserController extends ChangeNotifier {
-  BrowserController({required BrowserPageService pageService})
+  BrowserController({required BrowserPageServiceBase pageService})
     : _pageService = pageService;
 
-  final BrowserPageService _pageService;
+  final BrowserPageServiceBase _pageService;
   final TextEditingController addressController = TextEditingController();
 
   bool _loading = false;

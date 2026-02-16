@@ -28,3 +28,87 @@ jobs:
 
       - name: Validate spec support matrix
         run: flutter test test/spec_support/spec_matrix_test.dart --exclude-tags golden
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        run: flutter pub get
+        working-directory: example
+
+      - name: Build reader demo
+        run: flutter build web -t lib/main.dart --base-href /flutter_html_column_widget/reader/
+        working-directory: example
+
+      - name: Stage reader demo
+        run: |
+          mkdir -p site/reader
+          cp -r example/build/web/* site/reader/
+
+      - name: Build browser demo
+        run: flutter build web -t lib/browser_main.dart --base-href /flutter_html_column_widget/browser/
+        working-directory: example
+
+      - name: Stage browser demo
+        run: |
+          mkdir -p site/browser
+          cp -r example/build/web/* site/browser/
+
+      - name: Create landing page
+        run: |
+          cat > site/index.html << 'LANDING'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>flutter_html_column_viewer — Demos</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; color: #1a1a1a; }
+              h1 { font-size: 1.4rem; }
+              a { color: #1565c0; }
+              ul { list-style: none; padding: 0; }
+              li { margin: 12px 0; }
+              li a { display: inline-block; padding: 10px 16px; border: 1px solid #ccc; border-radius: 8px; text-decoration: none; }
+              li a:hover { background: #f0f4ff; }
+            </style>
+          </head>
+          <body>
+            <h1>flutter_html_column_viewer</h1>
+            <p>Live demos of the example apps:</p>
+            <ul>
+              <li><a href="reader/">Reader — Paginated column viewer</a></li>
+              <li><a href="browser/">Browser — In-app HTML browser</a></li>
+            </ul>
+            <p><small><a href="https://github.com/getBoolean/flutter_html_column_widget">Source on GitHub</a></small></p>
+          </body>
+          </html>
+          LANDING
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

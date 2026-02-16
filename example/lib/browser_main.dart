@@ -98,7 +98,7 @@ class _BrowserExamplePageState extends State<BrowserExamplePage> {
   @override
   void initState() {
     super.initState();
-    _controller = BrowserController(pageService: BrowserPageService());
+    _controller = BrowserController(pageService: createBrowserPageService());
     unawaited(_controller.openInitial(_defaultAddress));
   }
 

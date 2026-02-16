@@ -1,0 +1,22 @@
+[
+  {
+    "type": "HtmlTextBlockNode",
+    "id": "target",
+    "headingLevel": null,
+    "isBlockquote": false,
+    "preformatted": false,
+    "plainText": "hello",
+    "style": {
+      "color": "0xFF010203"
+    },
+    "segments": [
+      {
+        "text": "hello",
+        "isCode": false,
+        "style": {
+          "color": "0xFF010203"
+        }
+      }
+    ]
+  }
+]

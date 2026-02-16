@@ -1,0 +1,62 @@
+[
+  {
+    "type": "HtmlTextBlockNode",
+    "headingLevel": null,
+    "isBlockquote": false,
+    "preformatted": false,
+    "plainText": " Start bold italic 1 ",
+    "style": {},
+    "segments": [
+      {
+        "text": " Start ",
+        "isCode": false,
+        "style": {}
+      },
+      {
+        "text": "bold",
+        "isCode": false,
+        "style": {
+          "fontWeight": "FontWeight.w700"
+        }
+      },
+      {
+        "text": " ",
+        "isCode": false,
+        "style": {}
+      },
+      {
+        "text": "italic",
+        "isCode": false,
+        "style": {
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "text": " ",
+        "isCode": false,
+        "style": {}
+      },
+      {
+        "text": "1",
+        "isCode": false,
+        "style": {
+          "color": "0xFF1565C0",
+          "decoration": "TextDecoration.underline"
+        },
+        "reference": {
+          "raw": "#note1",
+          "path": null,
+          "fragmentId": "note1",
+          "isCfiLike": false,
+          "epubType": "noteref",
+          "role": "doc-noteref"
+        }
+      },
+      {
+        "text": " ",
+        "isCode": false,
+        "style": {}
+      }
+    ]
+  }
+]

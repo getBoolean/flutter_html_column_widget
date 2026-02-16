@@ -1,0 +1,25 @@
+[
+  {
+    "type": "HtmlTextBlockNode",
+    "headingLevel": null,
+    "isBlockquote": false,
+    "preformatted": false,
+    "plainText": "chapter text",
+    "style": {
+      "color": "0xFF224466",
+      "textAlign": "center",
+      "lineHeight": 2.0
+    },
+    "segments": [
+      {
+        "text": "chapter text",
+        "isCode": false,
+        "style": {
+          "color": "0xFF224466",
+          "textAlign": "center",
+          "lineHeight": 2.0
+        }
+      }
+    ]
+  }
+]

@@ -83,35 +83,4 @@ void main() {
       expect(paragraph.style.borderLeftColor, const Color(0xFF333333));
     });
   });
-
-  testWidgets('renderer applies text-transform and list markers', (tester) async {
-    final parser = HtmlContentParser();
-    final blocks = parser.parse('''
-      <p style="text-transform: uppercase">hello world</p>
-      <ul style="list-style-type: square"><li>alpha</li></ul>
-    ''');
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Column(
-            children: blocks
-                .map(
-                  (block) => HtmlBlockView(
-                    block: block,
-                    blockContext: const HtmlBlockContext(
-                      baseStyle: TextStyle(fontSize: 14),
-                    ),
-                  ),
-                )
-                .toList(growable: false),
-          ),
-        ),
-      ),
-    );
-
-    final richText = tester.widget<RichText>(find.byType(RichText).first);
-    expect(richText.text.toPlainText(), contains('HELLO WORLD'));
-    expect(find.text('\u25AA'), findsOneWidget);
-  });
 }

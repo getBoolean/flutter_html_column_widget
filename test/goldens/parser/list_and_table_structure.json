@@ -1,0 +1,44 @@
+[
+  {
+    "type": "HtmlListBlockNode",
+    "ordered": true,
+    "style": {
+      "listStyleType": "lowerRoman"
+    },
+    "items": [
+      [
+        {
+          "text": "One",
+          "isCode": false,
+          "style": {
+            "listStyleType": "lowerRoman"
+          }
+        }
+      ],
+      [
+        {
+          "text": "Two",
+          "isCode": false,
+          "style": {
+            "listStyleType": "lowerRoman"
+          }
+        }
+      ]
+    ]
+  },
+  {
+    "type": "HtmlTableBlockNode",
+    "hasHeader": true,
+    "style": {},
+    "rows": [
+      [
+        "H1",
+        "H2"
+      ],
+      [
+        "A",
+        "B"
+      ]
+    ]
+  }
+]

@@ -1,0 +1,17 @@
+[
+  {
+    "type": "HtmlImageBlockNode",
+    "id": "img1",
+    "src": "cover.jpg",
+    "alt": "Cover",
+    "intrinsicAspectRatio": 2.0
+  },
+  {
+    "type": "HtmlDividerBlockNode",
+    "id": "divider1"
+  },
+  {
+    "type": "HtmlColumnBreakBlockNode",
+    "id": "cb1"
+  }
+]

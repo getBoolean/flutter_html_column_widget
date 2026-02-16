@@ -1,0 +1,55 @@
+[
+  {
+    "type": "HtmlTextBlockNode",
+    "headingLevel": null,
+    "isBlockquote": false,
+    "preformatted": false,
+    "plainText": "a b c",
+    "style": {
+      "whiteSpace": "normal"
+    },
+    "segments": [
+      {
+        "text": "a b c",
+        "isCode": false,
+        "style": {
+          "whiteSpace": "normal"
+        }
+      }
+    ]
+  },
+  {
+    "type": "HtmlTextBlockNode",
+    "headingLevel": null,
+    "isBlockquote": false,
+    "preformatted": false,
+    "plainText": "x y\n z",
+    "style": {
+      "whiteSpace": "preLine"
+    },
+    "segments": [
+      {
+        "text": "x y\n z",
+        "isCode": false,
+        "style": {
+          "whiteSpace": "preLine"
+        }
+      }
+    ]
+  },
+  {
+    "type": "HtmlTextBlockNode",
+    "headingLevel": null,
+    "isBlockquote": false,
+    "preformatted": true,
+    "plainText": "k   l\n      m",
+    "style": {},
+    "segments": [
+      {
+        "text": "k   l\n      m",
+        "isCode": true,
+        "style": {}
+      }
+    ]
+  }
+]

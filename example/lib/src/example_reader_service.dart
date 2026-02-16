@@ -47,7 +47,6 @@ class ExampleReaderService extends ChangeNotifier {
   int _currentPage = 0;
   bool _isLoadingAdjacentChapter = false;
   Completer<void>? _chapterLoadCompleter;
-  bool _pendingAdvanceAfterChapterLoad = false;
   final Map<String, Future<Uint8List?>> _imageBytesByUrl =
       <String, Future<Uint8List?>>{};
   final HtmlContentParser _htmlParser = HtmlContentParser();
@@ -63,7 +62,8 @@ class ExampleReaderService extends ChangeNotifier {
       (_currentPage < _pageCount - 1 ||
           _chapters.nextChapterPath(
                 activeChapterPath:
-                    _chapterPathForPage(_currentPage) ?? _currentChapterPath,
+                    _chapterPathForForwardNavigation(_currentPage) ??
+                    _currentChapterPath,
                 resolveDocument: _paths.resolveDocument,
               ) !=
               null);
@@ -122,14 +122,17 @@ class ExampleReaderService extends ChangeNotifier {
 
     final nextChapterPath = _chapters.nextChapterPath(
       activeChapterPath:
-          _chapterPathForPage(_currentPage) ?? _currentChapterPath,
+          _chapterPathForForwardNavigation(_currentPage) ?? _currentChapterPath,
       resolveDocument: _paths.resolveDocument,
     );
     if (nextChapterPath == null) {
       return;
     }
-    _pendingAdvanceAfterChapterLoad = true;
-    unawaited(_ensureChapterLoaded(nextChapterPath));
+    // Navigate directly to the start of the next chapter instead of relying on
+    // deferred "advance after preload" state.
+    unawaited(
+      _navigateToChapterFragment(chapterPath: nextChapterPath, fragmentId: null),
+    );
   }
 
   Future<String?> handleLinkTap(HtmlReference reference) {
@@ -212,15 +215,6 @@ class ExampleReaderService extends ChangeNotifier {
 
   void onPageCountChanged(int count) {
     _pageCount = count;
-    if (_pendingAdvanceAfterChapterLoad &&
-        count > 0 &&
-        _currentPage < count - 1) {
-      _pendingAdvanceAfterChapterLoad = false;
-      readerController.pageController.nextPage(
-        duration: _pageAnimationDuration,
-        curve: _pageAnimationCurve,
-      );
-    }
     _maybePreloadUpcomingImages();
     notifyListeners();
   }
@@ -270,6 +264,25 @@ class ExampleReaderService extends ChangeNotifier {
       spreadPage: page,
       columnCount: _columnCount,
     );
+    return _chapterPathForColumn(currentColumn);
+  }
+
+  String? _chapterPathForForwardNavigation(int page) {
+    if (_columnCount <= 0) {
+      return _loadedChapters.isNotEmpty ? _loadedChapters.first : null;
+    }
+    final spreadStartColumn = _pagination.currentAbsoluteColumnForSpread(
+      spreadPage: page,
+      columnCount: _columnCount,
+    );
+    final spreadEndColumn = (spreadStartColumn + columnsPerPage - 1).clamp(
+      0,
+      _columnCount - 1,
+    );
+    return _chapterPathForColumn(spreadEndColumn);
+  }
+
+  String? _chapterPathForColumn(int currentColumn) {
     String? resolvedPath;
     var resolvedStart = -1;
     for (final chapterPath in _loadedChapters) {

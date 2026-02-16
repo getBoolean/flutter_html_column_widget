@@ -49,13 +49,34 @@ The parser uses a single tolerant HTML5 parsing path (via the `html` package) an
 
 ---
 
+## Supported platforms
+
+![Android](https://img.shields.io/badge/Android-orange?style=flat) ![iOS](https://img.shields.io/badge/iOS-orange?style=flat) ![Web](https://img.shields.io/badge/Web-orange?style=flat) ![Windows](https://img.shields.io/badge/Windows-orange?style=flat) ![macOS](https://img.shields.io/badge/macOS-orange?style=flat) ![Linux](https://img.shields.io/badge/Linux-orange?style=flat)
+
+100% Flutter widgets — no platform plugins, runs wherever Flutter runs.
+
+### Dependencies
+
+| Package | Purpose |
+| ------- | ------- |
+| [`html`](https://pub.dev/packages/html) | HTML parsing |
+| [`csslib`](https://pub.dev/packages/csslib) | CSS parsing |
+| [`image`](https://pub.dev/packages/image) | Image decoding for `<img>` elements |
+
+Requires **Dart SDK &ge; 3.11.0** and **Flutter &ge; 3.41.0**.
+
+---
+
 ## Installation
 
-Add to your `pubspec.yaml`:
+This package is not published on pub.dev. Add it via Git reference in your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_html_column_widget: ^0.0.1
+  flutter_html_column_widget:
+    git:
+      url: https://github.com/getBoolean/flutter_html_column_widget.git
+      ref: main # or a specific commit SHA
 ```
 
 ---

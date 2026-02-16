@@ -77,10 +77,46 @@ void main() {
       expect(paragraph.style.textIndent, closeTo(8, 0.0001));
       expect(paragraph.style.textTransform, HtmlTextTransform.uppercase);
       expect(paragraph.style.whiteSpace, HtmlWhiteSpace.preWrap);
-      expect(paragraph.style.margin, const EdgeInsets.symmetric(vertical: 4, horizontal: 8));
-      expect(paragraph.style.padding, const EdgeInsets.symmetric(vertical: 2, horizontal: 6));
+      expect(
+        paragraph.style.margin,
+        const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      );
+      expect(
+        paragraph.style.padding,
+        const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
+      );
       expect(paragraph.style.borderLeftWidth, closeTo(3, 0.0001));
       expect(paragraph.style.borderLeftColor, const Color(0xFF333333));
+    });
+
+    test('supports important precedence in cascade', () {
+      final parser = HtmlContentParser();
+      final blocks = parser.parse('''
+        <style>
+          p.note { color: #111111; }
+          p { color: #333333 !important; }
+        </style>
+        <section><p class="note" data-kind="x">value</p></section>
+      ''');
+      final paragraph = blocks.whereType<HtmlTextBlockNode>().first;
+      expect(paragraph.segments.first.style.color, const Color(0xFF333333));
+    });
+
+    test('parses all border sides from shorthand and side overrides', () {
+      final parser = HtmlContentParser();
+      final blocks = parser.parse('''
+        <p style="
+          border: 1px solid #111111;
+          border-top-width: 2px;
+          border-right-color: #00ff00;
+          border-bottom-style: dashed;
+        ">hello</p>
+      ''');
+      final paragraph = blocks.whereType<HtmlTextBlockNode>().first;
+      expect(paragraph.style.borderTopWidth, closeTo(2, 0.0001));
+      expect(paragraph.style.borderRightColor, const Color(0xFF00FF00));
+      expect(paragraph.style.borderBottomStyle, BorderStyle.solid);
+      expect(paragraph.style.borderLeftWidth, closeTo(1, 0.0001));
     });
   });
 }

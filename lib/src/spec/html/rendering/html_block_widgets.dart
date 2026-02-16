@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 
 import '../model/html_nodes.dart';
+import 'blocks/html_blockquote_block.dart';
+import 'blocks/html_table_block.dart';
+import 'inline/html_inline_span_builder.dart';
 
 /// Shared context passed to all HTML block widgets (styles, callbacks, image builder).
 @immutable
@@ -110,6 +112,8 @@ class HtmlTextBlock extends StatelessWidget {
 
   final HtmlTextBlockNode node;
   final HtmlBlockContext blockContext;
+  static const HtmlInlineSpanBuilder _inlineSpanBuilder =
+      HtmlInlineSpanBuilder();
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +136,11 @@ class HtmlTextBlock extends StatelessWidget {
       );
     }
 
-    final spans = _buildSpans(effectiveStyle);
+    final spans = _inlineSpanBuilder.buildTextSpans(
+      node: node,
+      baseStyle: effectiveStyle,
+      onRefTap: blockContext.onRefTap,
+    );
     final nowrap = node.style.whiteSpace == HtmlWhiteSpace.nowrap;
 
     Widget content = RichText(
@@ -142,82 +150,13 @@ class HtmlTextBlock extends StatelessWidget {
     );
 
     if (node.isBlockquote) {
-      content = _BlockquoteWrapper(child: content);
+      content = HtmlBlockquoteBlock(node: node, child: content);
     }
     return _applyBlockDecorations(
       context: context,
       style: node.style,
       child: content,
     );
-  }
-
-  List<InlineSpan> _buildSpans(TextStyle effectiveStyle) {
-    final spans = <InlineSpan>[];
-    for (final segment in node.segments) {
-      final segmentStyle = segment.style.applyToTextStyle(
-        segment.isCode
-            ? effectiveStyle.copyWith(fontFamily: 'monospace')
-            : effectiveStyle,
-      );
-      final transformedText = _transformText(
-        segment.text,
-        segment.style.textTransform ?? node.style.textTransform,
-      );
-
-      if (segment.reference != null && blockContext.onRefTap != null) {
-        spans.add(
-          TextSpan(
-            text: transformedText,
-            style: segmentStyle,
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => blockContext.onRefTap!(segment.reference!),
-          ),
-        );
-      } else {
-        spans.add(TextSpan(text: transformedText, style: segmentStyle));
-      }
-    }
-    if ((node.style.textIndent ?? 0) > 0 && spans.isNotEmpty) {
-      final indent = ' ' * (((node.style.textIndent ?? 0) / 4).round().clamp(1, 12));
-      final first = spans.first;
-      if (first is TextSpan) {
-        spans[0] = TextSpan(
-          text: '$indent${first.text ?? ''}',
-          style: first.style,
-          children: first.children,
-          recognizer: first.recognizer,
-          semanticsLabel: first.semanticsLabel,
-          mouseCursor: first.mouseCursor,
-          onEnter: first.onEnter,
-          onExit: first.onExit,
-          locale: first.locale,
-          spellOut: first.spellOut,
-        );
-      }
-    }
-    return spans;
-  }
-
-  String _transformText(String input, HtmlTextTransform? transform) {
-    switch (transform) {
-      case HtmlTextTransform.uppercase:
-        return input.toUpperCase();
-      case HtmlTextTransform.lowercase:
-        return input.toLowerCase();
-      case HtmlTextTransform.capitalize:
-        return input
-            .split(RegExp(r'(\s+)'))
-            .map((token) {
-              if (token.trim().isEmpty) {
-                return token;
-              }
-              return token[0].toUpperCase() + token.substring(1).toLowerCase();
-            })
-            .join();
-      case HtmlTextTransform.none:
-      case null:
-        return input;
-    }
   }
 }
 
@@ -245,25 +184,6 @@ class _PreformattedBlock extends StatelessWidget {
   }
 }
 
-class _BlockquoteWrapper extends StatelessWidget {
-  const _BlockquoteWrapper({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(color: Theme.of(context).dividerColor, width: 4),
-        ),
-      ),
-      padding: const EdgeInsets.only(left: 12),
-      child: child,
-    );
-  }
-}
-
 /// Renders [HtmlListBlockNode]: ordered and unordered lists.
 class HtmlListBlock extends StatelessWidget {
   const HtmlListBlock({
@@ -279,7 +199,8 @@ class HtmlListBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final textAlign = node.style.textAlign ?? TextAlign.start;
     final markerStyle = node.style.applyToTextStyle(blockContext.baseStyle);
-    final insideMarker = node.style.listStylePosition == HtmlListStylePosition.inside;
+    final insideMarker =
+        node.style.listStylePosition == HtmlListStylePosition.inside;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List<Widget>.generate(node.items.length, (index) {
@@ -322,10 +243,7 @@ class HtmlListBlock extends StatelessWidget {
                   Expanded(child: itemText),
                 ],
               );
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: child,
-        );
+        return Padding(padding: const EdgeInsets.only(bottom: 6), child: child);
       }),
     );
   }
@@ -414,6 +332,16 @@ class HtmlTableBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (node.tableModel != null) {
+      return _applyBlockDecorations(
+        context: context,
+        style: node.style,
+        child: HtmlSemanticTableBlock(
+          node: node,
+          baseStyle: blockContext.baseStyle,
+        ),
+      );
+    }
     final borderColor = Theme.of(context).dividerColor;
     final rows = node.rows;
     if (rows.isEmpty) {
@@ -450,9 +378,9 @@ class HtmlTableBlock extends StatelessWidget {
                   softWrap: true,
                   textAlign: node.style.textAlign,
                   style: rowIndex == 0 && node.hasHeader
-                      ? node.style.applyToTextStyle(blockContext.baseStyle).copyWith(
-                          fontWeight: FontWeight.w700,
-                        )
+                      ? node.style
+                            .applyToTextStyle(blockContext.baseStyle)
+                            .copyWith(fontWeight: FontWeight.w700)
                       : node.style.applyToTextStyle(blockContext.baseStyle),
                 ),
               );
@@ -697,31 +625,65 @@ Widget _applyBlockDecorations({
   required Widget child,
 }) {
   Widget current = child;
+  final resolvedPadding = style.boxStyle?.padding ?? style.padding;
+  final resolvedMargin = style.boxStyle?.margin ?? style.margin;
+  final resolvedBackground =
+      style.boxStyle?.backgroundColor ?? style.blockBackgroundColor;
+  final border = _resolveBoxBorder(context, style);
   final hasContainerStyle =
-      style.padding != null ||
-      style.blockBackgroundColor != null ||
-      (style.borderLeftWidth ?? 0) > 0;
+      resolvedPadding != null || resolvedBackground != null || border != null;
   if (hasContainerStyle) {
     current = Container(
-      padding: style.padding,
-      decoration: BoxDecoration(
-        color: style.blockBackgroundColor,
-        border: (style.borderLeftWidth ?? 0) > 0
-            ? Border(
-                left: BorderSide(
-                  width: style.borderLeftWidth ?? 0,
-                  color:
-                      style.borderLeftColor ?? Theme.of(context).dividerColor,
-                  style: style.borderLeftStyle ?? BorderStyle.solid,
-                ),
-              )
-            : null,
-      ),
+      padding: resolvedPadding,
+      decoration: BoxDecoration(color: resolvedBackground, border: border),
       child: current,
     );
   }
-  if (style.margin != null) {
-    current = Padding(padding: style.margin!, child: current);
+  if (resolvedMargin != null) {
+    current = Padding(padding: resolvedMargin, child: current);
   }
   return current;
+}
+
+Border? _resolveBoxBorder(BuildContext context, HtmlStyleData style) {
+  BorderSide? side(Color? color, double? width, BorderStyle? borderStyle) {
+    if ((width ?? 0) <= 0) {
+      return null;
+    }
+    return BorderSide(
+      width: width ?? 0,
+      color: color ?? Theme.of(context).dividerColor,
+      style: borderStyle ?? BorderStyle.solid,
+    );
+  }
+
+  final top = side(
+    style.borderTopColor,
+    style.borderTopWidth,
+    style.borderTopStyle,
+  );
+  final right = side(
+    style.borderRightColor,
+    style.borderRightWidth,
+    style.borderRightStyle,
+  );
+  final bottom = side(
+    style.borderBottomColor,
+    style.borderBottomWidth,
+    style.borderBottomStyle,
+  );
+  final left = side(
+    style.borderLeftColor,
+    style.borderLeftWidth,
+    style.borderLeftStyle,
+  );
+  if (top == null && right == null && bottom == null && left == null) {
+    return null;
+  }
+  return Border(
+    top: top ?? BorderSide.none,
+    right: right ?? BorderSide.none,
+    bottom: bottom ?? BorderSide.none,
+    left: left ?? BorderSide.none,
+  );
 }

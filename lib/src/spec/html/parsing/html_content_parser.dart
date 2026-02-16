@@ -3,13 +3,22 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:flutter/material.dart';
 
 import 'css_style_parser.dart';
+import 'html_inline_parser.dart';
+import 'html_table_parser.dart';
 import '../model/html_nodes.dart';
 
 class HtmlContentParser {
-  HtmlContentParser({CssStyleParser? styleParser})
-    : _styleParser = styleParser ?? const CssStyleParser();
+  HtmlContentParser({
+    CssStyleParser? styleParser,
+    HtmlTableParser? tableParser,
+    HtmlInlineParser? inlineParser,
+  }) : _styleParser = styleParser ?? CssStyleParser(),
+       _tableParser = tableParser ?? const HtmlTableParser(),
+       _inlineParser = inlineParser ?? const HtmlInlineParser();
 
   final CssStyleParser _styleParser;
+  final HtmlTableParser _tableParser;
+  final HtmlInlineParser _inlineParser;
 
   List<HtmlBlockNode> parse(
     String html, {
@@ -110,7 +119,7 @@ class HtmlContentParser {
     if (_isHeadingTag(tag)) {
       out.add(
         HtmlTextBlockNode(
-            segments: _parseInlineNodes(node.nodes, mergedStyle, rules),
+          segments: _parseInlineNodes(node.nodes, mergedStyle, rules),
           id: _elementId(node),
           headingLevel: int.parse(tag.substring(1)),
           style: mergedStyle,
@@ -148,18 +157,24 @@ class HtmlContentParser {
             isBlockquote: true,
           ),
         );
+      } else {
+        for (final child in node.nodes) {
+          _parseNodeIntoBlocks(child, mergedStyle, out, rules);
+        }
       }
       return;
     }
 
     if (tag == 'pre') {
-      final text = node.text;
-      if (text.trim().isNotEmpty) {
+      final segments = _inlineParser.parseCodeLike(
+        node,
+        mergedStyle,
+        isCode: true,
+      );
+      if (segments.isNotEmpty) {
         out.add(
           HtmlTextBlockNode(
-            segments: <HtmlInlineSegment>[
-              HtmlInlineSegment(text: text, style: mergedStyle, isCode: true),
-            ],
+            segments: segments,
             id: _elementId(node),
             style: mergedStyle,
             preformatted: true,
@@ -175,7 +190,15 @@ class HtmlContentParser {
       for (final li in node.children.where(
         (child) => _tagName(child) == 'li',
       )) {
-        items.add(_parseInlineNodes(li.nodes, mergedStyle, rules));
+        final itemSegments = _parseInlineNodes(li.nodes, mergedStyle, rules);
+        if (itemSegments.isNotEmpty) {
+          items.add(itemSegments);
+        }
+        for (final child in li.children.where(
+          (child) => _tagName(child) == 'ul' || _tagName(child) == 'ol',
+        )) {
+          _parseNodeIntoBlocks(child, mergedStyle, out, rules);
+        }
       }
       if (items.isNotEmpty) {
         out.add(
@@ -191,30 +214,20 @@ class HtmlContentParser {
     }
 
     if (tag == 'table') {
-      final rows = <List<String>>[];
-      bool hasHeader = false;
-      for (final tr in node.getElementsByTagName('tr')) {
-        final row = <String>[];
-        final cells = tr.children
-            .where((cell) => _tagName(cell) == 'th' || _tagName(cell) == 'td')
-            .toList(growable: false);
-        if (cells.isEmpty) {
-          continue;
-        }
-        if (cells.any((cell) => _tagName(cell) == 'th')) {
-          hasHeader = true;
-        }
-        for (final cell in cells) {
-          row.add(_normalizeWhitespace(cell.text));
-        }
-        rows.add(row);
-      }
+      final tableModel = _tableParser.parse(node);
+      final rows = tableModel.rows
+          .map(
+            (row) => row.cells.map((cell) => cell.text).toList(growable: false),
+          )
+          .toList(growable: false);
+      final hasHeader = tableModel.head.rows.isNotEmpty;
       if (rows.isNotEmpty) {
         out.add(
           HtmlTableBlockNode(
             rows: rows,
             id: _elementId(node),
             hasHeader: hasHeader,
+            tableModel: tableModel,
             style: mergedStyle,
           ),
         );
@@ -262,6 +275,7 @@ class HtmlContentParser {
 
   bool _isParagraphLikeTag(String tag) {
     return tag == 'p' ||
+        tag == 'span' ||
         tag == 'div' ||
         tag == 'article' ||
         tag == 'section' ||
@@ -269,6 +283,11 @@ class HtmlContentParser {
         tag == 'aside' ||
         tag == 'header' ||
         tag == 'footer' ||
+        tag == 'figure' ||
+        tag == 'figcaption' ||
+        tag == 'summary' ||
+        tag == 'details' ||
+        tag == 'address' ||
         tag == 'main';
   }
 
@@ -317,6 +336,39 @@ class HtmlContentParser {
         childStyle = childStyle.merge(
           const HtmlStyleData(decoration: TextDecoration.underline),
         );
+      } else if (tag == 'sub') {
+        childStyle = childStyle.merge(
+          HtmlStyleData(
+            fontSize:
+                (childStyle.fontSize ?? inheritedStyle.fontSize ?? 16) * 0.8,
+          ),
+        );
+      } else if (tag == 'sup') {
+        childStyle = childStyle.merge(
+          HtmlStyleData(
+            fontSize:
+                (childStyle.fontSize ?? inheritedStyle.fontSize ?? 16) * 0.8,
+          ),
+        );
+      } else if (tag == 'mark') {
+        childStyle = childStyle.merge(
+          const HtmlStyleData(backgroundColor: Color(0xFFFFFF8D)),
+        );
+      } else if (tag == 'small') {
+        childStyle = childStyle.merge(
+          HtmlStyleData(
+            fontSize:
+                (childStyle.fontSize ?? inheritedStyle.fontSize ?? 16) * 0.85,
+          ),
+        );
+      } else if (tag == 's' || tag == 'strike' || tag == 'del') {
+        childStyle = childStyle.merge(
+          const HtmlStyleData(decoration: TextDecoration.lineThrough),
+        );
+      } else if (tag == 'ins') {
+        childStyle = childStyle.merge(
+          const HtmlStyleData(decoration: TextDecoration.underline),
+        );
       } else if (tag == 'a') {
         final href = _cleanAttribute(_attribute(node, const <String>['href']));
         if (href != null && href.isNotEmpty) {
@@ -342,11 +394,13 @@ class HtmlContentParser {
         segments.add(HtmlInlineSegment(text: '\u200B', style: childStyle));
         continue;
       } else if (tag == 'code') {
-        final codeText = node.text;
-        if (codeText.isNotEmpty) {
-          segments.add(
-            HtmlInlineSegment(text: codeText, style: childStyle, isCode: true),
-          );
+        final codeSegments = _inlineParser.parseCodeLike(
+          node,
+          childStyle,
+          isCode: true,
+        );
+        if (codeSegments.isNotEmpty) {
+          segments.addAll(codeSegments);
         }
         continue;
       }
@@ -409,15 +463,17 @@ class HtmlContentParser {
     HtmlWhiteSpace? whiteSpace,
   }) {
     final mode = whiteSpace ?? HtmlWhiteSpace.normal;
-    final normalizedNewlines = input.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final normalizedNewlines = input
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n');
     final output = switch (mode) {
       HtmlWhiteSpace.pre || HtmlWhiteSpace.preWrap => normalizedNewlines,
       HtmlWhiteSpace.preLine => normalizedNewlines.replaceAll(
-          RegExp(r'[ \t\f]+'),
-          ' ',
-        ),
-      HtmlWhiteSpace.nowrap || HtmlWhiteSpace.normal => normalizedNewlines
-          .replaceAll(RegExp(r'[ \t\n\f]+'), ' '),
+        RegExp(r'[ \t\f]+'),
+        ' ',
+      ),
+      HtmlWhiteSpace.nowrap || HtmlWhiteSpace.normal =>
+        normalizedNewlines.replaceAll(RegExp(r'[ \t\n\f]+'), ' '),
     };
     return trim ? output.trim() : output;
   }
@@ -514,35 +570,10 @@ class HtmlContentParser {
     required List<CssStyleRule> rules,
   }) {
     var merged = inheritedStyle.inheritableOnly();
-    final tagName = _tagName(node);
-    final elementId = _cleanAttribute(_attribute(node, const <String>['id']));
-    final classNames =
-        (_cleanAttribute(_attribute(node, const <String>['class'])) ?? '')
-            .split(RegExp(r'\s+'))
-            .where((value) => value.trim().isNotEmpty)
-            .map((value) => value.trim().toLowerCase())
-            .toSet();
-
     final matched = rules
-        .where(
-          (rule) => rule.selector.matches(
-            tagName: tagName,
-            elementId: elementId,
-            elementClasses: classNames,
-          ),
-        )
-        .toList(growable: false)
-      ..sort((a, b) {
-        final specificityCompare = a.specificity.compareTo(b.specificity);
-        if (specificityCompare != 0) {
-          return specificityCompare;
-        }
-        return a.sourceOrder.compareTo(b.sourceOrder);
-      });
-
-    for (final rule in matched) {
-      merged = merged.merge(rule.style);
-    }
+        .where((rule) => _styleParser.matchesRule(rule, node))
+        .toList(growable: false);
+    merged = merged.merge(_styleParser.resolveMatchedRules(matched));
 
     merged = merged.merge(
       _styleParser.parseInlineStyle(_attribute(node, const <String>['style'])),
@@ -562,7 +593,8 @@ class HtmlContentParser {
 
     if (externalCssResolver != null) {
       for (final link in fragment.querySelectorAll('link')) {
-        final rel = (_attribute(link, const <String>['rel']) ?? '').toLowerCase();
+        final rel = (_attribute(link, const <String>['rel']) ?? '')
+            .toLowerCase();
         if (!rel.contains('stylesheet')) {
           continue;
         }

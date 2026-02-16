@@ -496,8 +496,8 @@ class ExampleReaderService extends ChangeNotifier {
       }
       final blocks = _htmlParser.parse(
         chapterHtml,
-        externalCss: ExampleDemoContent.externalCssByChapterPath[
-            _paths.canonicalPath(resolvedPath)],
+        externalCss: ExampleDemoContent
+            .externalCssByChapterPath[_paths.canonicalPath(resolvedPath)],
         externalCssResolver: resolveExternalCss,
       );
       return List<HtmlImageRef>.unmodifiable(

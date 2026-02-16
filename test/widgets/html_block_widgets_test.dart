@@ -3,7 +3,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_html_column_viewer/flutter_html_column_viewer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _buildBlocks(List<HtmlBlockNode> blocks, {HtmlRefTapCallback? onRefTap}) {
+Widget _buildBlocks(
+  List<HtmlBlockNode> blocks, {
+  HtmlRefTapCallback? onRefTap,
+}) {
   return MaterialApp(
     home: Scaffold(
       body: Column(
@@ -96,7 +99,9 @@ void main() {
       );
 
       TapGestureRecognizer? recognizer;
-      for (final richText in tester.widgetList<RichText>(find.byType(RichText))) {
+      for (final richText in tester.widgetList<RichText>(
+        find.byType(RichText),
+      )) {
         recognizer = _findTapRecognizerForText(richText.text, '1');
         if (recognizer != null) {
           break;

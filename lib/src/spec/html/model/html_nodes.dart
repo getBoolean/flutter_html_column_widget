@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'html_style_data.dart';
+import 'html_style_provenance.dart';
+import 'html_table_nodes.dart';
 
 typedef HtmlImageBuilder =
     Widget Function(BuildContext context, String src, String? alt);
@@ -133,6 +136,18 @@ class HtmlStyleData {
     this.borderLeftColor,
     this.borderLeftWidth,
     this.borderLeftStyle,
+    this.borderTopColor,
+    this.borderTopWidth,
+    this.borderTopStyle,
+    this.borderRightColor,
+    this.borderRightWidth,
+    this.borderRightStyle,
+    this.borderBottomColor,
+    this.borderBottomWidth,
+    this.borderBottomStyle,
+    this.boxStyle,
+    this.textStyle,
+    this.provenance = HtmlStyleProvenance.empty,
   });
 
   final Color? color;
@@ -158,6 +173,18 @@ class HtmlStyleData {
   final Color? borderLeftColor;
   final double? borderLeftWidth;
   final BorderStyle? borderLeftStyle;
+  final Color? borderTopColor;
+  final double? borderTopWidth;
+  final BorderStyle? borderTopStyle;
+  final Color? borderRightColor;
+  final double? borderRightWidth;
+  final BorderStyle? borderRightStyle;
+  final Color? borderBottomColor;
+  final double? borderBottomWidth;
+  final BorderStyle? borderBottomStyle;
+  final HtmlBoxStyle? boxStyle;
+  final HtmlTextStyleSpec? textStyle;
+  final HtmlStyleProvenance provenance;
 
   static const HtmlStyleData empty = HtmlStyleData();
 
@@ -189,6 +216,18 @@ class HtmlStyleData {
       borderLeftColor: other.borderLeftColor ?? borderLeftColor,
       borderLeftWidth: other.borderLeftWidth ?? borderLeftWidth,
       borderLeftStyle: other.borderLeftStyle ?? borderLeftStyle,
+      borderTopColor: other.borderTopColor ?? borderTopColor,
+      borderTopWidth: other.borderTopWidth ?? borderTopWidth,
+      borderTopStyle: other.borderTopStyle ?? borderTopStyle,
+      borderRightColor: other.borderRightColor ?? borderRightColor,
+      borderRightWidth: other.borderRightWidth ?? borderRightWidth,
+      borderRightStyle: other.borderRightStyle ?? borderRightStyle,
+      borderBottomColor: other.borderBottomColor ?? borderBottomColor,
+      borderBottomWidth: other.borderBottomWidth ?? borderBottomWidth,
+      borderBottomStyle: other.borderBottomStyle ?? borderBottomStyle,
+      boxStyle: (boxStyle ?? const HtmlBoxStyle()).merge(other.boxStyle),
+      textStyle: other.textStyle ?? textStyle,
+      provenance: provenance.merge(other.provenance),
     );
   }
 
@@ -209,6 +248,7 @@ class HtmlStyleData {
       listStyleType: listStyleType,
       listStylePosition: listStylePosition,
       listStyleImage: listStyleImage,
+      textStyle: textStyle,
     );
   }
 
@@ -254,7 +294,18 @@ class HtmlStyleData {
             listStyleImage == other.listStyleImage &&
             borderLeftColor == other.borderLeftColor &&
             borderLeftWidth == other.borderLeftWidth &&
-            borderLeftStyle == other.borderLeftStyle;
+            borderLeftStyle == other.borderLeftStyle &&
+            borderTopColor == other.borderTopColor &&
+            borderTopWidth == other.borderTopWidth &&
+            borderTopStyle == other.borderTopStyle &&
+            borderRightColor == other.borderRightColor &&
+            borderRightWidth == other.borderRightWidth &&
+            borderRightStyle == other.borderRightStyle &&
+            borderBottomColor == other.borderBottomColor &&
+            borderBottomWidth == other.borderBottomWidth &&
+            borderBottomStyle == other.borderBottomStyle &&
+            boxStyle == other.boxStyle &&
+            textStyle == other.textStyle;
   }
 
   @override
@@ -282,6 +333,17 @@ class HtmlStyleData {
     borderLeftColor,
     borderLeftWidth,
     borderLeftStyle,
+    borderTopColor,
+    borderTopWidth,
+    borderTopStyle,
+    borderRightColor,
+    borderRightWidth,
+    borderRightStyle,
+    borderBottomColor,
+    borderBottomWidth,
+    borderBottomStyle,
+    boxStyle,
+    textStyle,
   ]);
 }
 
@@ -433,11 +495,13 @@ class HtmlTableBlockNode extends HtmlBlockNode {
     required this.rows,
     super.id,
     this.hasHeader = false,
+    this.tableModel,
     this.style = HtmlStyleData.empty,
   });
 
   final List<List<String>> rows;
   final bool hasHeader;
+  final HtmlTableModel? tableModel;
   final HtmlStyleData style;
 
   @override

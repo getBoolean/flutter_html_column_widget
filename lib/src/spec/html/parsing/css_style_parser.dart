@@ -1,211 +1,299 @@
-import 'package:csslib/parser.dart' as css_parser;
+import 'package:html/dom.dart' as dom;
 import 'package:flutter/material.dart';
 
+import '../diagnostics/html_css_diagnostics.dart';
+import '../diagnostics/html_css_warning.dart';
+import '../model/html_style_data.dart';
+import '../model/html_style_provenance.dart';
 import '../model/html_nodes.dart';
-
-@immutable
-class CssSimpleSelector {
-  const CssSimpleSelector({
-    this.tag,
-    this.id,
-    this.classes = const <String>{},
-  });
-
-  final String? tag;
-  final String? id;
-  final Set<String> classes;
-
-  int get specificity =>
-      (id != null ? 100 : 0) + (classes.length * 10) + (tag != null ? 1 : 0);
-
-  bool matches({
-    required String tagName,
-    required String? elementId,
-    required Set<String> elementClasses,
-  }) {
-    if (tag != null && tag != tagName.toLowerCase()) {
-      return false;
-    }
-    if (id != null && id != (elementId?.toLowerCase())) {
-      return false;
-    }
-    for (final className in classes) {
-      if (!elementClasses.contains(className)) {
-        return false;
-      }
-    }
-    return true;
-  }
-}
+import 'css_ast_adapter.dart';
+import 'css_cascade_engine.dart';
+import 'css_selector_engine.dart';
 
 @immutable
 class CssStyleRule {
   const CssStyleRule({
     required this.selector,
+    required this.selectorText,
+    required this.declarations,
     required this.style,
+    required this.provenance,
     required this.sourceOrder,
   });
 
-  final CssSimpleSelector selector;
+  final CssSelector selector;
+  final String selectorText;
+  final List<CssDeclaration> declarations;
   final HtmlStyleData style;
+  final HtmlStyleProvenance provenance;
   final int sourceOrder;
 
   int get specificity => selector.specificity;
 }
 
 class CssStyleParser {
-  const CssStyleParser();
+  CssStyleParser({HtmlCssDiagnostics? diagnostics})
+    : _diagnostics = diagnostics ?? const HtmlCssDiagnostics(),
+      _selectorEngine = const CssSelectorEngine(),
+      _cascadeEngine = const CssCascadeEngine(),
+      _astAdapter = CssAstAdapter(diagnostics: diagnostics);
+
+  final HtmlCssDiagnostics _diagnostics;
+  final CssSelectorEngine _selectorEngine;
+  final CssCascadeEngine _cascadeEngine;
+  final CssAstAdapter _astAdapter;
 
   HtmlStyleData parseInlineStyle(String? style) {
     if (style == null || style.trim().isEmpty) {
       return HtmlStyleData.empty;
     }
-
-    final declarations = _parseDeclarations(style);
+    final declarations = _astAdapter.parseInlineDeclarations(style);
     if (declarations.isEmpty) {
       return HtmlStyleData.empty;
     }
-
-    return _styleFromDeclarations(declarations);
+    return _styleFromDeclarations(
+      declarations,
+      selectorText: '<inline>',
+      sourceOrder: 0,
+      origin: HtmlStyleOrigin.inline,
+    );
   }
 
   List<CssStyleRule> parseStyleSheet(String? css, {int startSourceOrder = 0}) {
     if (css == null || css.trim().isEmpty) {
       return const <CssStyleRule>[];
     }
-    final parsedText = css.replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
-    final rules = <CssStyleRule>[];
-    var sourceOrder = startSourceOrder;
-    for (final match in RegExp(r'([^{}]+)\{([^{}]*)\}').allMatches(parsedText)) {
-      final selectorGroup = match.group(1)?.trim() ?? '';
-      final declarationsText = match.group(2)?.trim() ?? '';
-      if (selectorGroup.isEmpty || declarationsText.isEmpty) {
-        continue;
-      }
-      final declarations = _declarationMap(declarationsText);
-      final styleData = _styleFromDeclarations(declarations);
-      for (final selectorToken in selectorGroup.split(',')) {
-        final selector = _parseSimpleSelector(selectorToken.trim());
-        if (selector == null) {
-          continue;
-        }
-        rules.add(
-          CssStyleRule(
-            selector: selector,
-            style: styleData,
-            sourceOrder: sourceOrder++,
+
+    final parsed = _astAdapter.parseStyleSheet(
+      css,
+      startSourceOrder: startSourceOrder,
+    );
+    return parsed
+        .map(
+          (rule) => CssStyleRule(
+            selector: rule.selector,
+            selectorText: rule.selectorText,
+            declarations: rule.declarations,
+            style: _styleFromDeclarations(
+              rule.declarations,
+              selectorText: rule.selectorText,
+              sourceOrder: rule.sourceOrder,
+              origin: HtmlStyleOrigin.stylesheet,
+            ),
+            provenance: _provenanceFromDeclarations(
+              rule.declarations,
+              selectorText: rule.selectorText,
+              sourceOrder: rule.sourceOrder,
+              origin: HtmlStyleOrigin.stylesheet,
+            ),
+            sourceOrder: rule.sourceOrder,
           ),
-        );
-      }
-    }
-    return rules;
+        )
+        .toList(growable: false);
   }
 
-  HtmlStyleData _styleFromDeclarations(Map<String, String> declarations) {
-    final border = _parseBorderDeclaration(declarations['border']);
-    final borderLeft = _parseBorderDeclaration(declarations['border-left']);
-    return HtmlStyleData(
-      color: _parseColor(declarations['color']),
-      backgroundColor: _parseColor(declarations['background-color']),
-      blockBackgroundColor: _parseColor(declarations['background-color']),
-      fontSize: _parseFontSize(declarations['font-size']),
-      fontWeight: _parseFontWeight(declarations['font-weight']),
-      fontStyle: _parseFontStyle(declarations['font-style']),
-      fontFamily: _parseFontFamily(declarations['font-family']),
-      decoration: _parseTextDecoration(declarations['text-decoration']),
-      textAlign: _parseTextAlign(declarations['text-align']),
-      lineHeight: _parseLineHeight(declarations['line-height']),
-      letterSpacing: _parseLength(
-        declarations['letter-spacing'],
-        percentBase: 16,
-      ),
-      wordSpacing: _parseLength(
-        declarations['word-spacing'],
-        percentBase: 16,
-      ),
-      textIndent: _parseLength(declarations['text-indent']),
-      textTransform: _parseTextTransform(declarations['text-transform']),
-      whiteSpace: _parseWhiteSpace(declarations['white-space']),
-      margin: _parseBoxShorthand(
-        shorthand: declarations['margin'],
-        top: declarations['margin-top'],
-        right: declarations['margin-right'],
-        bottom: declarations['margin-bottom'],
-        left: declarations['margin-left'],
-      ),
-      padding: _parseBoxShorthand(
-        shorthand: declarations['padding'],
-        top: declarations['padding-top'],
-        right: declarations['padding-right'],
-        bottom: declarations['padding-bottom'],
-        left: declarations['padding-left'],
-      ),
-      listStyleType: _parseListStyleType(
-        declarations['list-style-type'],
-        listStyle: declarations['list-style'],
-      ),
-      listStylePosition: _parseListStylePosition(
-        declarations['list-style-position'],
-        listStyle: declarations['list-style'],
-      ),
-      listStyleImage: _parseListStyleImage(
-        declarations['list-style-image'],
-        listStyle: declarations['list-style'],
-      ),
-      borderLeftColor:
-          _parseColor(declarations['border-left-color']) ??
-          borderLeft?.color ??
-          _parseColor(declarations['border-color']) ??
-          border?.color,
-      borderLeftWidth:
-          _parseLength(declarations['border-left-width']) ??
-          borderLeft?.width ??
-          _parseLength(declarations['border-width']) ??
-          border?.width,
-      borderLeftStyle:
-          _parseBorderStyle(declarations['border-left-style']) ??
-          borderLeft?.style ??
-          _parseBorderStyle(declarations['border-style']) ??
-          border?.style,
+  bool matchesRule(CssStyleRule rule, dom.Element node) {
+    return _selectorEngine.matches(rule.selector, node);
+  }
+
+  HtmlStyleData resolveMatchedRules(List<CssStyleRule> rules) {
+    if (rules.isEmpty) {
+      return HtmlStyleData.empty;
+    }
+    final parsed = rules
+        .map(
+          (rule) => CssParsedRule(
+            selector: rule.selector,
+            selectorText: rule.selectorText,
+            declarations: rule.declarations,
+            sourceOrder: rule.sourceOrder,
+          ),
+        )
+        .toList(growable: false);
+    final winning = _cascadeEngine.resolveDeclarations(parsed);
+    return _styleFromDeclarations(
+      winning,
+      selectorText: '<cascade>',
+      sourceOrder: 0,
+      origin: HtmlStyleOrigin.stylesheet,
     );
   }
 
-  Map<String, String> _parseDeclarations(String style) {
-    final sheet = css_parser.parse('* { $style }');
-    final normalized = sheet.toString();
-    final openBrace = normalized.indexOf('{');
-    final closeBrace = normalized.lastIndexOf('}');
-    if (openBrace == -1 || closeBrace == -1 || closeBrace <= openBrace) {
-      return _fallbackParse(style);
-    }
+  HtmlStyleData _styleFromDeclarations(
+    List<CssDeclaration> declarations, {
+    required String selectorText,
+    required int sourceOrder,
+    required HtmlStyleOrigin origin,
+  }) {
+    final map = <String, String>{
+      for (final declaration in declarations)
+        declaration.property: declaration.value,
+    };
+    final border = _parseBorderDeclaration(map['border']);
+    final borderLeft = _parseBorderDeclaration(map['border-left']);
+    final borderTop = _parseBorderDeclaration(map['border-top']);
+    final borderRight = _parseBorderDeclaration(map['border-right']);
+    final borderBottom = _parseBorderDeclaration(map['border-bottom']);
+    final sharedBorderColor = _parseColor(map['border-color']) ?? border?.color;
+    final sharedBorderWidth =
+        _parseLength(map['border-width']) ?? border?.width;
+    final sharedBorderStyle =
+        _parseBorderStyle(map['border-style']) ?? border?.style;
+    final resolvedTop = _resolveBorderSide(
+      explicit: _parseBorderDeclaration(map['border-top']),
+      fallback: borderTop ?? border,
+      colorOverride: _parseColor(map['border-top-color']),
+      widthOverride: _parseLength(map['border-top-width']),
+      styleOverride: _parseBorderStyle(map['border-top-style']),
+      sharedColor: sharedBorderColor,
+      sharedWidth: sharedBorderWidth,
+      sharedStyle: sharedBorderStyle,
+    );
+    final resolvedRight = _resolveBorderSide(
+      explicit: _parseBorderDeclaration(map['border-right']),
+      fallback: borderRight ?? border,
+      colorOverride: _parseColor(map['border-right-color']),
+      widthOverride: _parseLength(map['border-right-width']),
+      styleOverride: _parseBorderStyle(map['border-right-style']),
+      sharedColor: sharedBorderColor,
+      sharedWidth: sharedBorderWidth,
+      sharedStyle: sharedBorderStyle,
+    );
+    final resolvedBottom = _resolveBorderSide(
+      explicit: _parseBorderDeclaration(map['border-bottom']),
+      fallback: borderBottom ?? border,
+      colorOverride: _parseColor(map['border-bottom-color']),
+      widthOverride: _parseLength(map['border-bottom-width']),
+      styleOverride: _parseBorderStyle(map['border-bottom-style']),
+      sharedColor: sharedBorderColor,
+      sharedWidth: sharedBorderWidth,
+      sharedStyle: sharedBorderStyle,
+    );
+    final resolvedLeft = _resolveBorderSide(
+      explicit: borderLeft,
+      fallback: borderLeft ?? border,
+      colorOverride: _parseColor(map['border-left-color']),
+      widthOverride: _parseLength(map['border-left-width']),
+      styleOverride: _parseBorderStyle(map['border-left-style']),
+      sharedColor: sharedBorderColor,
+      sharedWidth: sharedBorderWidth,
+      sharedStyle: sharedBorderStyle,
+    );
 
-    final body = normalized.substring(openBrace + 1, closeBrace);
-    return _declarationMap(body);
-  }
-
-  Map<String, String> _fallbackParse(String style) {
-    return _declarationMap(style);
-  }
-
-  Map<String, String> _declarationMap(String text) {
-    final out = <String, String>{};
-    final parts = text.split(';');
-    for (final part in parts) {
-      final token = part.trim();
-      if (token.isEmpty) {
-        continue;
-      }
-      final colonIndex = token.indexOf(':');
-      if (colonIndex <= 0) {
-        continue;
-      }
-      final key = token.substring(0, colonIndex).trim().toLowerCase();
-      final value = token.substring(colonIndex + 1).trim();
-      if (key.isNotEmpty && value.isNotEmpty) {
-        out[key] = value;
-      }
-    }
-    return out;
+    return HtmlStyleData(
+      color: _parseColor(map['color']),
+      backgroundColor: _parseColor(map['background-color']),
+      blockBackgroundColor: _parseColor(map['background-color']),
+      fontSize: _parseFontSize(map['font-size']),
+      fontWeight: _parseFontWeight(map['font-weight']),
+      fontStyle: _parseFontStyle(map['font-style']),
+      fontFamily: _parseFontFamily(map['font-family']),
+      decoration: _parseTextDecoration(map['text-decoration']),
+      textAlign: _parseTextAlign(map['text-align']),
+      lineHeight: _parseLineHeight(map['line-height']),
+      letterSpacing: _parseLength(map['letter-spacing'], percentBase: 16),
+      wordSpacing: _parseLength(map['word-spacing'], percentBase: 16),
+      textIndent: _parseLength(map['text-indent']),
+      textTransform: _parseTextTransform(map['text-transform']),
+      whiteSpace: _parseWhiteSpace(map['white-space']),
+      margin: _parseBoxShorthand(
+        shorthand: map['margin'],
+        top: map['margin-top'],
+        right: map['margin-right'],
+        bottom: map['margin-bottom'],
+        left: map['margin-left'],
+      ),
+      padding: _parseBoxShorthand(
+        shorthand: map['padding'],
+        top: map['padding-top'],
+        right: map['padding-right'],
+        bottom: map['padding-bottom'],
+        left: map['padding-left'],
+      ),
+      listStyleType: _parseListStyleType(
+        map['list-style-type'],
+        listStyle: map['list-style'],
+      ),
+      listStylePosition: _parseListStylePosition(
+        map['list-style-position'],
+        listStyle: map['list-style'],
+      ),
+      listStyleImage: _parseListStyleImage(
+        map['list-style-image'],
+        listStyle: map['list-style'],
+      ),
+      borderTopColor: resolvedTop.color,
+      borderTopWidth: resolvedTop.width,
+      borderTopStyle: resolvedTop.style,
+      borderRightColor: resolvedRight.color,
+      borderRightWidth: resolvedRight.width,
+      borderRightStyle: resolvedRight.style,
+      borderBottomColor: resolvedBottom.color,
+      borderBottomWidth: resolvedBottom.width,
+      borderBottomStyle: resolvedBottom.style,
+      borderLeftColor: resolvedLeft.color,
+      borderLeftWidth: resolvedLeft.width,
+      borderLeftStyle: resolvedLeft.style,
+      boxStyle: HtmlBoxStyle(
+        margin: _parseBoxShorthand(
+          shorthand: map['margin'],
+          top: map['margin-top'],
+          right: map['margin-right'],
+          bottom: map['margin-bottom'],
+          left: map['margin-left'],
+        ),
+        padding: _parseBoxShorthand(
+          shorthand: map['padding'],
+          top: map['padding-top'],
+          right: map['padding-right'],
+          bottom: map['padding-bottom'],
+          left: map['padding-left'],
+        ),
+        backgroundColor: _parseColor(map['background-color']),
+        border: HtmlBorderStyle(
+          top: HtmlStyleSide(
+            color: resolvedTop.color,
+            width: resolvedTop.width,
+            style: resolvedTop.style,
+          ),
+          right: HtmlStyleSide(
+            color: resolvedRight.color,
+            width: resolvedRight.width,
+            style: resolvedRight.style,
+          ),
+          bottom: HtmlStyleSide(
+            color: resolvedBottom.color,
+            width: resolvedBottom.width,
+            style: resolvedBottom.style,
+          ),
+          left: HtmlStyleSide(
+            color: resolvedLeft.color,
+            width: resolvedLeft.width,
+            style: resolvedLeft.style,
+          ),
+        ),
+      ),
+      textStyle: HtmlTextStyleSpec(
+        color: _parseColor(map['color']),
+        backgroundColor: _parseColor(map['background-color']),
+        fontSize: _parseFontSize(map['font-size']),
+        fontWeight: _parseFontWeight(map['font-weight']),
+        fontStyle: _parseFontStyle(map['font-style']),
+        fontFamily: _parseFontFamily(map['font-family']),
+        decoration: _parseTextDecoration(map['text-decoration']),
+        textAlign: _parseTextAlign(map['text-align']),
+        lineHeight: _parseLineHeight(map['line-height']),
+        letterSpacing: _parseLength(map['letter-spacing'], percentBase: 16),
+        wordSpacing: _parseLength(map['word-spacing'], percentBase: 16),
+        textIndent: _parseLength(map['text-indent']),
+      ),
+      provenance: _provenanceFromDeclarations(
+        declarations,
+        selectorText: selectorText,
+        sourceOrder: sourceOrder,
+        origin: origin,
+      ),
+    );
   }
 
   double? _parseFontSize(String? value) {
@@ -243,8 +331,17 @@ class CssStyleParser {
       return null;
     }
     final v = value.trim().toLowerCase();
+    if (v == 'normal') {
+      return FontWeight.w400;
+    }
     if (v == 'bold') {
       return FontWeight.w700;
+    }
+    if (v == 'bolder') {
+      return FontWeight.w700;
+    }
+    if (v == 'lighter') {
+      return FontWeight.w300;
     }
     final n = int.tryParse(v);
     if (n == null) {
@@ -299,14 +396,18 @@ class CssStyleParser {
       return null;
     }
     final v = value.toLowerCase();
+    final decorations = <TextDecoration>[];
     if (v.contains('underline')) {
-      return TextDecoration.underline;
+      decorations.add(TextDecoration.underline);
     }
     if (v.contains('line-through')) {
-      return TextDecoration.lineThrough;
+      decorations.add(TextDecoration.lineThrough);
     }
     if (v.contains('overline')) {
-      return TextDecoration.overline;
+      decorations.add(TextDecoration.overline);
+    }
+    if (decorations.isNotEmpty) {
+      return TextDecoration.combine(decorations);
     }
     if (v.contains('none')) {
       return TextDecoration.none;
@@ -412,9 +513,10 @@ class CssStyleParser {
     if (candidate == null) {
       return null;
     }
-    final match = RegExp(r'url\((.+)\)', caseSensitive: false).firstMatch(
-      candidate,
-    );
+    final match = RegExp(
+      r'url\((.+)\)',
+      caseSensitive: false,
+    ).firstMatch(candidate);
     if (match == null) {
       return null;
     }
@@ -511,6 +613,7 @@ class CssStyleParser {
       case 'ridge':
       case 'inset':
       case 'outset':
+      case 'initial':
         return BorderStyle.solid;
       case 'none':
       case 'hidden':
@@ -528,7 +631,9 @@ class CssStyleParser {
     if (v == '0') {
       return 0;
     }
-    final match = RegExp(r'^(-?[\d.]+)\s*(px|pt|em|rem|%)?$').firstMatch(v);
+    final match = RegExp(
+      r'^(-?[\d.]+)\s*(px|pt|em|rem|%|vh|vw|vmin|vmax|ch|ex|cm|mm|in)?$',
+    ).firstMatch(v);
     if (match == null) {
       return null;
     }
@@ -550,6 +655,27 @@ class CssStyleParser {
           return null;
         }
         return (number / 100) * percentBase;
+      case 'vh':
+      case 'vw':
+      case 'vmin':
+      case 'vmax':
+        _diagnostics.warn(
+          const HtmlCssWarning(
+            code: 'viewport-unit-fallback',
+            message:
+                'Viewport unit parsed without viewport context; using px value.',
+          ),
+        );
+        return number;
+      case 'ch':
+      case 'ex':
+        return number * 8;
+      case 'cm':
+        return number * 37.7952755906;
+      case 'mm':
+        return number * 3.7795275591;
+      case 'in':
+        return number * 96;
       default:
         return null;
     }
@@ -573,6 +699,9 @@ class CssStyleParser {
       if (hex.length == 8) {
         return Color(int.parse(hex, radix: 16));
       }
+      return null;
+    }
+    if (v == 'currentcolor') {
       return null;
     }
 
@@ -622,41 +751,6 @@ class CssStyleParser {
     return _namedColors[v];
   }
 
-  CssSimpleSelector? _parseSimpleSelector(String selector) {
-    if (selector.isEmpty ||
-        selector.contains(RegExp(r'[\s>+~:\[\*]')) ||
-        selector.contains('::')) {
-      return null;
-    }
-    final tagMatch = RegExp(r'^[a-zA-Z][\w-]*').firstMatch(selector);
-    final tag = tagMatch?.group(0)?.toLowerCase();
-    final tail = selector.substring(tag?.length ?? 0);
-    final matches = RegExp(r'([#.])([\w-]+)').allMatches(tail).toList();
-    var consumedLength = 0;
-    String? id;
-    final classes = <String>{};
-    for (final match in matches) {
-      consumedLength += match.group(0)!.length;
-      final prefix = match.group(1)!;
-      final value = match.group(2)!.toLowerCase();
-      if (prefix == '#') {
-        if (id != null) {
-          return null;
-        }
-        id = value;
-      } else {
-        classes.add(value);
-      }
-    }
-    if (consumedLength != tail.length) {
-      return null;
-    }
-    if (tag == null && id == null && classes.isEmpty) {
-      return null;
-    }
-    return CssSimpleSelector(tag: tag, id: id, classes: classes);
-  }
-
   static const Map<String, Color> _namedColors = <String, Color>{
     'black': Colors.black,
     'white': Colors.white,
@@ -671,6 +765,113 @@ class CssStyleParser {
     'brown': Colors.brown,
     'teal': Colors.teal,
     'pink': Colors.pink,
+    'aqua': Color(0xFF00FFFF),
+    'cyan': Color(0xFF00FFFF),
+    'fuchsia': Color(0xFFFF00FF),
+    'lime': Color(0xFF00FF00),
+    'maroon': Color(0xFF800000),
+    'navy': Color(0xFF000080),
+    'olive': Color(0xFF808000),
+    'silver': Color(0xFFC0C0C0),
+  };
+
+  _BorderParts _resolveBorderSide({
+    required _BorderParts? explicit,
+    required _BorderParts? fallback,
+    required Color? colorOverride,
+    required double? widthOverride,
+    required BorderStyle? styleOverride,
+    required Color? sharedColor,
+    required double? sharedWidth,
+    required BorderStyle? sharedStyle,
+  }) {
+    return _BorderParts(
+      color: colorOverride ?? explicit?.color ?? fallback?.color ?? sharedColor,
+      width: widthOverride ?? explicit?.width ?? fallback?.width ?? sharedWidth,
+      style: styleOverride ?? explicit?.style ?? fallback?.style ?? sharedStyle,
+    );
+  }
+
+  HtmlStyleProvenance _provenanceFromDeclarations(
+    List<CssDeclaration> declarations, {
+    required String selectorText,
+    required int sourceOrder,
+    required HtmlStyleOrigin origin,
+  }) {
+    final out = <String, HtmlStyleProvenanceEntry>{};
+    for (final declaration in declarations) {
+      out[declaration.property] = HtmlStyleProvenanceEntry(
+        property: declaration.property,
+        value: declaration.value,
+        origin: origin,
+        selector: selectorText,
+        important: declaration.important,
+        sourceOrder: sourceOrder,
+      );
+      if (!_supportedProperties.contains(declaration.property)) {
+        _diagnostics.warn(
+          HtmlCssWarning(
+            code: 'unsupported-property',
+            message: 'Property is currently unsupported.',
+            selector: selectorText,
+            property: declaration.property,
+            value: declaration.value,
+          ),
+        );
+      }
+    }
+    return HtmlStyleProvenance(out);
+  }
+
+  static const Set<String> _supportedProperties = <String>{
+    'color',
+    'background-color',
+    'font-size',
+    'font-weight',
+    'font-style',
+    'font-family',
+    'text-decoration',
+    'text-align',
+    'line-height',
+    'letter-spacing',
+    'word-spacing',
+    'text-indent',
+    'text-transform',
+    'white-space',
+    'margin',
+    'margin-top',
+    'margin-right',
+    'margin-bottom',
+    'margin-left',
+    'padding',
+    'padding-top',
+    'padding-right',
+    'padding-bottom',
+    'padding-left',
+    'list-style',
+    'list-style-type',
+    'list-style-position',
+    'list-style-image',
+    'border',
+    'border-color',
+    'border-style',
+    'border-width',
+    'border-top',
+    'border-right',
+    'border-bottom',
+    'border-left',
+    'border-top-color',
+    'border-right-color',
+    'border-bottom-color',
+    'border-left-color',
+    'border-top-width',
+    'border-right-width',
+    'border-bottom-width',
+    'border-left-width',
+    'border-top-style',
+    'border-right-style',
+    'border-bottom-style',
+    'border-left-style',
   };
 }
 

@@ -68,5 +68,19 @@ void main() {
       expect(text, contains('First'));
       expect(text, contains('Second'));
     });
+
+    test('keeps blockquote content with nested paragraphs', () {
+      final parser = HtmlContentParser();
+      final blocks = parser.parse(
+        '<blockquote><p>Quoted</p><p>Text</p></blockquote>',
+      );
+
+      final text = blocks
+          .whereType<HtmlTextBlockNode>()
+          .map((block) => block.plainText)
+          .join(' ');
+      expect(text, contains('Quoted'));
+      expect(text, contains('Text'));
+    });
   });
 }

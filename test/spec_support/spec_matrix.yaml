@@ -1,0 +1,52 @@
+version: 1
+html:
+  tags:
+    table: supported
+    thead: supported
+    tbody: supported
+    tfoot: supported
+    tr: supported
+    td: supported
+    th: supported
+    caption: supported
+    colgroup: partial
+    col: partial
+    blockquote: supported
+    pre: supported
+    code: supported
+    dl: deferred
+    dt: deferred
+    dd: deferred
+    span: supported
+    sub: supported
+    sup: supported
+    mark: supported
+css:
+  selectors:
+    type: supported
+    class: supported
+    id: supported
+    descendant: supported
+    child: supported
+    adjacentSibling: supported
+    generalSibling: supported
+    attribute: supported
+    pseudoClass_firstChild: supported
+    pseudoClass_lastChild: supported
+    pseudoClass_nthChild: supported
+  atRules:
+    media: partial
+    supports: partial
+    import: partial
+  properties:
+    border: supported
+    border_top: supported
+    border_right: supported
+    border_bottom: supported
+    border_left: supported
+    text_decoration_multi: supported
+    text_indent_layout: supported
+    list_style_image: partial
+    important: supported
+  diagnostics:
+    unsupported_css_logging_debug_only: supported

@@ -123,16 +123,16 @@ void main() {
       builder: () => _labeledGolden(
         name: 'external link style and inline style sheet ordering',
         child: _renderParsedHtml(
-              '''
+          '''
               <link rel="stylesheet" href="chapter.css" />
               <style>.chapter { line-height: 2; }</style>
               <p class="chapter">chapter text</p>
               ''',
-              externalCss: '.chapter { text-align: center; }',
-              linkedCss: const <String, String>{
-                'chapter.css': '.chapter { line-height: 1.8; color: #224466; }',
-              },
-            ),
+          externalCss: '.chapter { text-align: center; }',
+          linkedCss: const <String, String>{
+            'chapter.css': '.chapter { line-height: 1.8; color: #224466; }',
+          },
+        ),
       ),
     );
   });

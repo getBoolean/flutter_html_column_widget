@@ -25,3 +25,6 @@ jobs:
 
       - name: Run tests
         run: flutter test --exclude-tags golden
+
+      - name: Validate spec support matrix
+        run: flutter test test/spec_support/spec_matrix_test.dart --exclude-tags golden

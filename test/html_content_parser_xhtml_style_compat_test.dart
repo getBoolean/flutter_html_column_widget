@@ -23,22 +23,25 @@ void main() {
       expect(linkedSegment.reference?.role, 'doc-noteref');
     });
 
-    test('supports XHTML-style self-closing syntax for mixed inline/block tags', () {
-      final parser = HtmlContentParser();
-      final blocks = parser.parse('''
+    test(
+      'supports XHTML-style self-closing syntax for mixed inline/block tags',
+      () {
+        final parser = HtmlContentParser();
+        final blocks = parser.parse('''
         <p>Before<br/>After</p>
         <hr/>
         <img src="cover.jpg" alt="Cover"/>
       ''');
 
-      final paragraph = blocks.whereType<HtmlTextBlockNode>().first;
-      expect(paragraph.plainText, contains('Before'));
-      expect(paragraph.plainText, contains('\n'));
-      expect(paragraph.plainText, contains('After'));
+        final paragraph = blocks.whereType<HtmlTextBlockNode>().first;
+        expect(paragraph.plainText, contains('Before'));
+        expect(paragraph.plainText, contains('\n'));
+        expect(paragraph.plainText, contains('After'));
 
-      expect(blocks.whereType<HtmlDividerBlockNode>(), hasLength(1));
-      expect(blocks.whereType<HtmlImageBlockNode>(), hasLength(1));
-    });
+        expect(blocks.whereType<HtmlDividerBlockNode>(), hasLength(1));
+        expect(blocks.whereType<HtmlImageBlockNode>(), hasLength(1));
+      },
+    );
 
     test('parses XHTML-style attributes for image sizing', () {
       final parser = HtmlContentParser();

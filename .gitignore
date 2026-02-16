@@ -30,4 +30,3 @@ migrate_working_dir/
 /build/
 /coverage/
 .vscode/settings.json
-/test/golden/failures

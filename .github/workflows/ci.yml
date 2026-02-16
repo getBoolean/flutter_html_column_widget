@@ -81,7 +81,7 @@ jobs:
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>flutter_html_column_viewer — Demos</title>
+            <title>flutter_html_column_widget — Demos</title>
             <style>
               body { font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; color: #1a1a1a; }
               h1 { font-size: 1.4rem; }
@@ -93,7 +93,7 @@ jobs:
             </style>
           </head>
           <body>
-            <h1>flutter_html_column_viewer</h1>
+            <h1>flutter_html_column_widget</h1>
             <p>Live demos of the example apps:</p>
             <ul>
               <li><a href="reader/">Reader — Paginated column viewer</a></li>

@@ -117,6 +117,41 @@ void main() {
       expect(tapped?.role, 'doc-noteref');
     });
 
+    testWidgets('list item anchor tap dispatches parsed HtmlReference', (
+      tester,
+    ) async {
+      final parser = HtmlContentParser();
+      final blocks = parser.parse(
+        '<ul><li><a href="#chapter-1">Chapter 1</a></li></ul>',
+      );
+      HtmlReference? tapped;
+
+      await tester.pumpWidget(
+        _buildBlocks(
+          blocks,
+          onRefTap: (reference) {
+            tapped = reference;
+          },
+        ),
+      );
+
+      TapGestureRecognizer? recognizer;
+      for (final richText in tester.widgetList<RichText>(
+        find.byType(RichText),
+      )) {
+        recognizer = _findTapRecognizerForText(richText.text, 'Chapter 1');
+        if (recognizer != null) {
+          break;
+        }
+      }
+      expect(recognizer, isNotNull);
+      recognizer!.onTap?.call();
+
+      expect(tapped, isNotNull);
+      expect(tapped?.raw, '#chapter-1');
+      expect(tapped?.fragmentId, 'chapter-1');
+    });
+
     testWidgets('preformatted block keeps original newlines and spacing', (
       tester,
     ) async {

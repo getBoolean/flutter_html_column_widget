@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 
@@ -212,14 +213,7 @@ class HtmlListBlock extends StatelessWidget {
           textAlign: textAlign,
           text: TextSpan(
             style: markerStyle,
-            children: segments
-                .map(
-                  (segment) => TextSpan(
-                    text: segment.text,
-                    style: segment.style.applyToTextStyle(markerStyle),
-                  ),
-                )
-                .toList(growable: false),
+            children: _inlineSpansForSegments(segments, markerStyle),
           ),
         );
         final child = insideMarker
@@ -229,12 +223,7 @@ class HtmlListBlock extends StatelessWidget {
                   style: markerStyle,
                   children: <InlineSpan>[
                     TextSpan(text: '$bullet '),
-                    ...segments.map(
-                      (segment) => TextSpan(
-                        text: segment.text,
-                        style: segment.style.applyToTextStyle(markerStyle),
-                      ),
-                    ),
+                    ..._inlineSpansForSegments(segments, markerStyle),
                   ],
                 ),
               )
@@ -248,6 +237,27 @@ class HtmlListBlock extends StatelessWidget {
         return Padding(padding: const EdgeInsets.only(bottom: 6), child: child);
       }),
     );
+  }
+
+  List<InlineSpan> _inlineSpansForSegments(
+    List<HtmlInlineSegment> segments,
+    TextStyle markerStyle,
+  ) {
+    return segments
+        .map((segment) {
+          final style = segment.style.applyToTextStyle(markerStyle);
+          final reference = segment.reference;
+          if (reference == null || blockContext.onRefTap == null) {
+            return TextSpan(text: segment.text, style: style);
+          }
+          return TextSpan(
+            text: segment.text,
+            style: style,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => blockContext.onRefTap!(reference),
+          );
+        })
+        .toList(growable: false);
   }
 
   String _markerForIndex(int index) {

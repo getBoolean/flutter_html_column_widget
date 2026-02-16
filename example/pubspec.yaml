@@ -12,6 +12,7 @@ dependencies:
   flutter_html_column_viewer:
     path: ../
   flutter_inappwebview: 6.2.0-beta.3
+  html: ^0.15.6
   url_launcher: ^6.2.0
 
 dev_dependencies:

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 
 import 'html_nodes.dart';
 
@@ -356,6 +357,8 @@ class HtmlImageBlock extends StatefulWidget {
 }
 
 class _HtmlImageBlockState extends State<HtmlImageBlock> {
+  static const double _fallbackAspectRatio = 16 / 9;
+
   Future<Uint8List?>? _bytesFuture;
   Uint8List? _resolvedBytes;
 
@@ -398,8 +401,6 @@ class _HtmlImageBlockState extends State<HtmlImageBlock> {
     }
     final imageRef = HtmlImageRef.fromNode(widget.node);
     final imageUrl = imageRef.src.trim();
-    final altText = imageRef.alt?.trim();
-    final colorScheme = Theme.of(context).colorScheme;
     final onImageTap = widget.blockContext.onImageTap;
 
     void handleImageTap() {
@@ -413,87 +414,68 @@ class _HtmlImageBlockState extends State<HtmlImageBlock> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onImageTap == null ? null : handleImageTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: _bytesFuture == null
-                    ? _buildNetworkOrUnavailable(
-                        context: context,
-                        imageUrl: imageUrl,
-                        unavailableLabel: 'Image unavailable: ${imageRef.src}',
-                      )
-                    : FutureBuilder<Uint8List?>(
-                        future: _bytesFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState !=
-                              ConnectionState.done) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-                          final bytes = snapshot.data;
-                          if (bytes != null && bytes.isNotEmpty) {
-                            _resolvedBytes = bytes;
-                            return Image.memory(bytes, fit: BoxFit.cover);
-                          }
-                          _resolvedBytes = null;
-                          return _buildUnavailable(
-                            context: context,
-                            unavailableLabel:
-                                'Image unavailable: ${imageRef.src}',
-                          );
-                        },
-                      ),
+      child: _bytesFuture == null
+          ? AspectRatio(
+              aspectRatio: _fallbackAspectRatio,
+              child: _buildNetworkOrUnavailable(
+                context: context,
+                imageUrl: imageUrl,
+                imageRef: imageRef,
               ),
+            )
+          : FutureBuilder<Uint8List?>(
+              future: _bytesFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const AspectRatio(
+                    aspectRatio: _fallbackAspectRatio,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final bytes = snapshot.data;
+                if (bytes != null && bytes.isNotEmpty) {
+                  _resolvedBytes = bytes;
+                  final aspectRatio =
+                      _decodeAspectRatioFromBytes(bytes) ??
+                      _fallbackAspectRatio;
+                  return AspectRatio(
+                    aspectRatio: aspectRatio,
+                    child: Image.memory(bytes, fit: BoxFit.contain),
+                  );
+                }
+                _resolvedBytes = null;
+                return AspectRatio(
+                  aspectRatio: _fallbackAspectRatio,
+                  child: _buildUnavailable(
+                    context: context,
+                    imageRef: imageRef,
+                  ),
+                );
+              },
             ),
-            if (altText != null && altText.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 8),
-              Text(
-                altText,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
-              ),
-            ],
-            const SizedBox(height: 6),
-            Text(
-              imageRef.src,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-          ],
-        ),
-      ),
     );
+  }
+
+  double? _decodeAspectRatioFromBytes(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null || decoded.width <= 0 || decoded.height <= 0) {
+      return null;
+    }
+    return decoded.width / decoded.height;
   }
 
   Widget _buildNetworkOrUnavailable({
     required BuildContext context,
     required String imageUrl,
-    required String unavailableLabel,
+    required HtmlImageRef imageRef,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
     final uri = Uri.tryParse(imageUrl);
     final isNetwork =
         uri != null &&
         (uri.scheme.toLowerCase() == 'http' ||
             uri.scheme.toLowerCase() == 'https');
     if (!isNetwork) {
-      return _buildUnavailable(
-        context: context,
-        unavailableLabel: unavailableLabel,
-      );
+      return _buildUnavailable(context: context, imageRef: imageRef);
     }
     return Image.network(
       imageUrl,
@@ -505,37 +487,42 @@ class _HtmlImageBlockState extends State<HtmlImageBlock> {
         return const Center(child: CircularProgressIndicator());
       },
       errorBuilder: (context, error, stackTrace) {
-        return ColoredBox(
-          color: colorScheme.errorContainer,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                'Image failed to load',
-                style: TextStyle(color: colorScheme.onErrorContainer),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        );
+        return _buildUnavailable(context: context, imageRef: imageRef);
       },
     );
   }
 
   Widget _buildUnavailable({
     required BuildContext context,
-    required String unavailableLabel,
+    required HtmlImageRef imageRef,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final altText = imageRef.alt?.trim();
     return ColoredBox(
       color: colorScheme.tertiaryContainer,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Text(
-            unavailableLabel,
-            style: TextStyle(color: colorScheme.onTertiaryContainer),
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              if (altText != null && altText.isNotEmpty) ...<Widget>[
+                Text(
+                  altText,
+                  style: TextStyle(
+                    color: colorScheme.onTertiaryContainer,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+              ],
+              Text(
+                imageRef.src,
+                style: TextStyle(color: colorScheme.onTertiaryContainer),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),

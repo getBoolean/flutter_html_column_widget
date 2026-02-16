@@ -163,5 +163,61 @@ void main() {
       expect(find.text('line 1\n  line 2\nline 3'), findsOneWidget);
       expect(find.byType(DecoratedBox), findsWidgets);
     });
+
+    testWidgets('semantic table allocates wider column for long content', (
+      tester,
+    ) async {
+      final parser = HtmlContentParser();
+      final blocks = parser.parse(
+        '''
+        <table border cellspacing="0" cellpadding="3">
+          <tr><td colspan="2"><strong>TABLE Testing Section</strong></td></tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>This is a much longer table cell that should receive more width.</td>
+          </tr>
+        </table>
+        ''',
+      );
+
+      await tester.pumpWidget(_buildBlocks(blocks));
+
+      final rows = tester.widgetList<Row>(
+        find.byType(Row),
+      );
+      final dataRow = rows.firstWhere(
+        (row) =>
+            row.children.length == 2 &&
+            row.children.every((child) => child is Expanded),
+      );
+      final first = dataRow.children[0] as Expanded;
+      final second = dataRow.children[1] as Expanded;
+      expect(second.flex, greaterThan(first.flex * 8));
+    });
+
+    testWidgets('semantic table renders nested list blocks inside cells', (
+      tester,
+    ) async {
+      final parser = HtmlContentParser();
+      final blocks = parser.parse(
+        '''
+        <table>
+          <tr>
+            <td>
+              <ul><li>alpha</li></ul>
+              <ol><li>one</li></ol>
+            </td>
+          </tr>
+        </table>
+        ''',
+      );
+
+      await tester.pumpWidget(_buildBlocks(blocks));
+
+      expect(_anyRichTextContains(tester, '\u2022'), isTrue);
+      expect(_anyRichTextContains(tester, 'alpha'), isTrue);
+      expect(_anyRichTextContains(tester, '1.'), isTrue);
+      expect(_anyRichTextContains(tester, 'one'), isTrue);
+    });
   });
 }

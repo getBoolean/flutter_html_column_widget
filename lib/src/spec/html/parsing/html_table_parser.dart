@@ -84,7 +84,8 @@ class HtmlTableParser {
           final colSpan = int.tryParse(cell.attributes['colspan'] ?? '') ?? 1;
           final rowSpan = int.tryParse(cell.attributes['rowspan'] ?? '') ?? 1;
           return HtmlTableCellNode(
-            text: _normalize(cell.text),
+            text: _extractCellText(cell),
+            html: cell.innerHtml.trim(),
             isHeader: _tag(cell) == 'th',
             colSpan: colSpan.clamp(1, 1000),
             rowSpan: rowSpan.clamp(1, 1000),
@@ -96,6 +97,66 @@ class HtmlTableParser {
   }
 
   String _tag(dom.Element element) => element.localName?.toLowerCase() ?? '';
+
+  String _extractCellText(dom.Element cell) {
+    final hasList = cell.querySelector('ul, ol') != null;
+    if (!hasList) {
+      return _normalize(cell.text);
+    }
+    final lines = <String>[];
+    _collectCellLines(cell, lines: lines);
+    final normalizedLines = lines
+        .map(_normalize)
+        .where((line) => line.isNotEmpty)
+        .toList(growable: false);
+    return normalizedLines.join('\n');
+  }
+
+  void _collectCellLines(
+    dom.Node node, {
+    required List<String> lines,
+  }) {
+    if (node is dom.Text) {
+      final text = _normalize(node.text);
+      if (text.isNotEmpty) {
+        if (lines.isEmpty) {
+          lines.add(text);
+        } else {
+          lines[lines.length - 1] = '${lines.last} $text';
+        }
+      }
+      return;
+    }
+    if (node is! dom.Element) {
+      return;
+    }
+    final tag = _tag(node);
+    if (tag == 'ul' || tag == 'ol') {
+      var ordinal = 1;
+      for (final li in node.children.where((child) => _tag(child) == 'li')) {
+        final marker = tag == 'ol' ? '${ordinal++}. ' : '\u2022 ';
+        lines.add(marker);
+        _collectCellLines(
+          li,
+          lines: lines,
+        );
+      }
+      return;
+    }
+    if (tag == 'li') {
+      for (final child in node.nodes) {
+        _collectCellLines(child, lines: lines);
+      }
+      return;
+    }
+    if (tag == 'br') {
+      lines.add('');
+      return;
+    }
+    for (final child in node.nodes) {
+      _collectCellLines(child, lines: lines);
+    }
+  }
 
   String _normalize(String text) => text.replaceAll(RegExp(r'\s+'), ' ').trim();
 }

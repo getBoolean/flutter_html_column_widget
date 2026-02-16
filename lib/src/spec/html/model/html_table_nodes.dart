@@ -6,6 +6,7 @@ enum HtmlTableSectionKind { head, body, foot }
 class HtmlTableCellNode {
   const HtmlTableCellNode({
     required this.text,
+    this.html = '',
     this.isHeader = false,
     this.colSpan = 1,
     this.rowSpan = 1,
@@ -13,6 +14,7 @@ class HtmlTableCellNode {
   });
 
   final String text;
+  final String html;
   final bool isHeader;
   final int colSpan;
   final int rowSpan;

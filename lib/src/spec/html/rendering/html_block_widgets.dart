@@ -345,12 +345,24 @@ class HtmlTableBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (node.tableModel != null) {
+      final nestedContext = HtmlBlockContext(
+        baseStyle: node.style.applyToTextStyle(blockContext.baseStyle),
+        headingStyles: blockContext.headingStyles,
+        onRefTap: blockContext.onRefTap,
+        onImageTap: blockContext.onImageTap,
+        imageBuilder: blockContext.imageBuilder,
+        imageBytesBuilder: blockContext.imageBytesBuilder,
+        viewportHeight: blockContext.viewportHeight,
+      );
       return _applyBlockDecorations(
         context: context,
         style: node.style,
         child: HtmlSemanticTableBlock(
           node: node,
           baseStyle: blockContext.baseStyle,
+          blockBuilder: (block) {
+            return HtmlBlockView(block: block, blockContext: nestedContext);
+          },
         ),
       );
     }

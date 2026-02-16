@@ -91,14 +91,10 @@ class _ExamplePageState extends State<ExamplePage> {
     }
     showDialog<void>(
       context: context,
-      barrierColor: Colors.black87,
       builder: (context) {
         return Dialog.fullscreen(
           child: Scaffold(
-            backgroundColor: Colors.black,
             appBar: AppBar(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
               title: Text(
                 imageRef.alt?.trim().isNotEmpty == true
                     ? imageRef.alt!

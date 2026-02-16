@@ -98,15 +98,38 @@ for (var i = 0; i < 3; i++) {
     <td>Uses Image.network by default</td>
   </tr>
 </table>
+<h3 id="image-estimation-demo">Image estimation demo</h3>
+<p>
+The next images include both explicit dimensions and missing dimensions so you can
+compare column height estimation behavior.
+</p>
 <img
-  id="example-image"
+  id="example-image-sized-attrs"
+  src="https://picsum.photos/id/1043/720/320"
+  width="720"
+  height="320"
+  alt="Network image with width and height attributes"
+>
+<img
+  id="example-image-sized-style"
+  src="https://picsum.photos/id/1059/480/640"
+  style="width: 480px; height: 640px;"
+  alt="Network image with width and height in inline style"
+>
+<img
+  id="example-image-fallback-fill-1"
   src="https://picsum.photos/640/220"
-  alt="Example network image rendered from the img tag"
+  alt="Network image with no width and height, should estimate as full column height"
 >
 <img
   id="example-epub-image-path"
   src="images/chapter1-illustration.jpg"
-  alt="Example EPUB-style relative image path resolved by imageBuilder"
+  alt="Example EPUB-style relative image path with no dimensions, resolved by imageBuilder"
+>
+<img
+  id="example-image-fallback-fill-2"
+  src="images/chapter2-illustration.jpg"
+  alt="Second EPUB-style image path with no dimensions, should estimate as full column height"
 >
 <h2 id="section2">Section 2</h2>
 <p>Intro paragraph for chapter 1.</p>

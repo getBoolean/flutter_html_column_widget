@@ -204,6 +204,7 @@ abstract class HtmlBlockNode {
   double estimateHeight({
     required double columnWidth,
     required TextStyle baseTextStyle,
+    required double viewportHeight,
   });
 }
 
@@ -230,6 +231,7 @@ class HtmlTextBlockNode extends HtmlBlockNode {
   double estimateHeight({
     required double columnWidth,
     required TextStyle baseTextStyle,
+    required double viewportHeight,
   }) {
     final text = plainText.trim();
     if (text.isEmpty) {
@@ -279,6 +281,7 @@ class HtmlListBlockNode extends HtmlBlockNode {
   double estimateHeight({
     required double columnWidth,
     required TextStyle baseTextStyle,
+    required double viewportHeight,
   }) {
     var total = 0.0;
     final itemWidth = (columnWidth - 22).clamp(40.0, double.infinity);
@@ -312,6 +315,7 @@ class HtmlTableBlockNode extends HtmlBlockNode {
   double estimateHeight({
     required double columnWidth,
     required TextStyle baseTextStyle,
+    required double viewportHeight,
   }) {
     if (rows.isEmpty) {
       return 0;
@@ -345,17 +349,27 @@ class HtmlTableBlockNode extends HtmlBlockNode {
 
 @immutable
 class HtmlImageBlockNode extends HtmlBlockNode {
-  const HtmlImageBlockNode({required this.src, this.alt, super.id});
+  const HtmlImageBlockNode({
+    required this.src,
+    this.alt,
+    this.intrinsicAspectRatio,
+    super.id,
+  });
 
   final String src;
   final String? alt;
+  final double? intrinsicAspectRatio;
 
   @override
   double estimateHeight({
     required double columnWidth,
     required TextStyle baseTextStyle,
+    required double viewportHeight,
   }) {
-    final imageHeight = columnWidth * (9 / 16);
+    final aspectRatio = intrinsicAspectRatio;
+    final imageHeight = aspectRatio != null && aspectRatio > 0
+        ? columnWidth / aspectRatio
+        : viewportHeight;
     const safetyBuffer = 2.0;
     return imageHeight + safetyBuffer;
   }
@@ -369,6 +383,7 @@ class HtmlDividerBlockNode extends HtmlBlockNode {
   double estimateHeight({
     required double columnWidth,
     required TextStyle baseTextStyle,
+    required double viewportHeight,
   }) {
     return 28;
   }
@@ -382,6 +397,7 @@ class HtmlColumnBreakBlockNode extends HtmlBlockNode {
   double estimateHeight({
     required double columnWidth,
     required TextStyle baseTextStyle,
+    required double viewportHeight,
   }) {
     return 0;
   }

@@ -193,6 +193,7 @@ class HtmlColumnReader extends StatelessWidget {
       final estimate = block.estimateHeight(
         columnWidth: columnWidth,
         baseTextStyle: baseStyle,
+        viewportHeight: viewportHeight,
       );
       final projected = currentHeight + estimate + interBlockSpacing;
       if (currentColumn.isNotEmpty && projected > maxHeight) {

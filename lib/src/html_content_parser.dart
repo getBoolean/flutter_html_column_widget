@@ -81,6 +81,7 @@ class HtmlContentParser {
           HtmlImageBlockNode(
             src: src,
             alt: node.attributes['alt'],
+            intrinsicAspectRatio: _inferImageAspectRatio(node),
             id: _elementId(node),
           ),
         );
@@ -367,5 +368,43 @@ class HtmlContentParser {
 
   String? _elementId(dom.Element node) {
     return _cleanAttribute(node.attributes['id']);
+  }
+
+  double? _inferImageAspectRatio(dom.Element node) {
+    final width =
+        _extractDimension(node.attributes['width']) ??
+        _extractStylePropertyDimension(node.attributes['style'], 'width');
+    final height =
+        _extractDimension(node.attributes['height']) ??
+        _extractStylePropertyDimension(node.attributes['style'], 'height');
+    if (width == null || height == null || width <= 0 || height <= 0) {
+      return null;
+    }
+    return width / height;
+  }
+
+  double? _extractStylePropertyDimension(String? style, String property) {
+    if (style == null || style.trim().isEmpty) {
+      return null;
+    }
+    final match = RegExp(
+      '(?:^|;)\\s*${RegExp.escape(property)}\\s*:\\s*([^;]+)',
+      caseSensitive: false,
+    ).firstMatch(style);
+    if (match == null) {
+      return null;
+    }
+    return _extractDimension(match.group(1));
+  }
+
+  double? _extractDimension(String? input) {
+    if (input == null) {
+      return null;
+    }
+    final match = RegExp(r'-?\d+(\.\d+)?').firstMatch(input);
+    if (match == null) {
+      return null;
+    }
+    return double.tryParse(match.group(0)!);
   }
 }

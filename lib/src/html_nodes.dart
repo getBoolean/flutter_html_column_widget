@@ -356,28 +356,8 @@ class HtmlImageBlockNode extends HtmlBlockNode {
     required TextStyle baseTextStyle,
   }) {
     final imageHeight = columnWidth * (9 / 16);
-    final altText = alt?.trim();
-    final altHeight = (altText == null || altText.isEmpty)
-        ? 0.0
-        : _measureTextHeight(
-                altText,
-                style: baseTextStyle.copyWith(
-                  fontStyle: FontStyle.italic,
-                  height: 1.35,
-                ),
-                maxWidth: columnWidth,
-              ) +
-              8;
-    const verticalContainerPadding = 10.0 * 2;
-    const metadataGap = 6.0;
-    const metadataLineHeight = 16.0;
     const safetyBuffer = 2.0;
-    return imageHeight +
-        altHeight +
-        verticalContainerPadding +
-        metadataGap +
-        metadataLineHeight +
-        safetyBuffer;
+    return imageHeight + safetyBuffer;
   }
 }
 

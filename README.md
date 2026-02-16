@@ -2,6 +2,13 @@
 
 **HTML in columns — built entirely with Flutter widgets.** No WebView, no platform views. Parse HTML, flow it into a paged multi-column layout, and swipe through pages like a magazine.
 
+> [!WARNING]
+> This is a **proof of concept** built with help from Cursor Agents. The CSS-to-Flutter style engine is **incomplete and buggy** - a production version would need much more work, including `ThemeData` overrides support.
+>
+> **How columns work:** All rendering uses `TextStyle`, so text can be measured **before layout**. This is what enables content to flow across columns and reflow on resize.
+>
+> **Limitations:** Pre-layout measurement means custom widget builders won't work - their height is unknown until after layout. Images read `width`/`height` from HTML attributes; without them, the image fills the entire column.
+
 ---
 
 ## Why this package?
